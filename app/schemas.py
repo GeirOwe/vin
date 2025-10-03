@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import List, Optional
+from enum import Enum
+from typing import List, Optional, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -66,3 +67,53 @@ class WineResponse(BaseModel):
 class DrinkingWindowSuggestionResponse(BaseModel):
     drink_after_date: date
     drink_before_date: date
+
+
+# Filtering & pagination
+class WineType(str, Enum):
+    Red = "Red"
+    White = "White"
+    Rose = "Rose"
+    Sparkling = "Sparkling"
+    Dessert = "Dessert"
+    Fortified = "Fortified"
+
+
+class WineFilterParameters(BaseModel):
+    search_term: Optional[str] = None
+    wine_type: Optional[WineType] = None
+    vintage: Optional[int] = Field(default=None, ge=1800, le=2100)
+    country: Optional[str] = None
+    district: Optional[str] = None
+    subdistrict: Optional[str] = None
+
+
+class PaginationParams(BaseModel):
+    page: int = Field(1, ge=1)
+    page_size: int = Field(10, ge=1, le=100)
+
+
+class SortingParams(BaseModel):
+    sort_by: Literal["id", "name", "producer", "vintage", "type"] = "id"
+    sort_order: Literal["asc", "desc"] = "desc"
+
+
+class WineListItem(BaseModel):
+    id: int
+    name: str
+    producer: Optional[str]
+    vintage: Optional[int]
+    type: Optional[str]
+    quantity: Optional[int] = None
+    grape_composition: List[GrapeCompositionResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class WineListPageResponse(BaseModel):
+    items: List[WineListItem]
+    page: int
+    page_size: int
+    total_items: int
+    total_pages: int

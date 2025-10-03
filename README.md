@@ -62,8 +62,8 @@ This starts the dev server on `http://localhost:5173`.
   - Pricing & Quantity (validated, currency formatting)
   - Drinking Window (validated; Suggest Dates via backend endpoint)
   - Grape Composition (dynamic rows, validated total ≤ 100%)
-- Wine List page showing saved entries
-- Toggle between New Wine and Wine List in the header
+- Collection (Paged) view: paginated list with sorting and client-side search
+- Header toggle between New Wine and Collection (Paged)
 
 ## Environment
 Copy and adjust the example file:
@@ -83,6 +83,7 @@ Base URL: `http://localhost:8000` (or `8001` if you changed the port)
 - GET `/` → Service banner
 - GET `/health` → Healthcheck
 - GET `/api/wines` → List wines with grape compositions
+- GET `/api/wines/page` → Paginated wines (page, page_size, sort_by, sort_order)
 - POST `/api/wines` → Create a wine
   - Payload fields:
     - Required: `name`
@@ -150,7 +151,7 @@ vin/
         PricingQuantityInput.tsx
         WineDetailsInput.tsx
         WineEntryForm.tsx
-        WineList.tsx
+        WineCollectionListView.tsx
         ui/{button.tsx,input.tsx,label.tsx}
       hooks/useApi.ts
       App.tsx
