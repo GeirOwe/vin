@@ -44,8 +44,9 @@ export default function InventoryUpdateControls({
   const updateQuantity = async (newQuantity: number) => {
     if (newQuantity < 0) return
 
+    const quantityChange = newQuantity - currentQuantity
     const result = await patchJson(`http://localhost:8000/api/wines/${wineId}/quantity`, {
-      quantity: newQuantity
+      quantity_change: quantityChange
     })
 
     if (result) {

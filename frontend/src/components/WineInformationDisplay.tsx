@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Wine } from '../types/wine'
-import InventoryUpdateControls from './InventoryUpdateControls'
 import InventoryTrackingSystemView from './InventoryTrackingSystemView'
 
 interface WineInformationDisplayProps {
@@ -59,11 +58,10 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, showInv
               <span className="text-sm font-medium text-gray-600">Vintage</span>
               <p className="text-base">{wine.vintage || '—'}</p>
             </div>
-            <InventoryUpdateControls
-              wineId={wine.id}
-              currentQuantity={wine.quantity || 0}
-              onQuantityUpdate={onQuantityUpdate}
-            />
+            <div>
+              <span className="text-sm font-medium text-gray-600">Quantity</span>
+              <p className="text-base">{wine.quantity || '—'}</p>
+            </div>
           </div>
         </CardContent>
       </Card>

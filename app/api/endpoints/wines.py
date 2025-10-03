@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session, selectinload
 
 from ...database import get_db, engine, Base
-from ...models import Wine, GrapeComposition, InventoryLog
+from ...models import Wine, GrapeComposition, InventoryLog, TastingNote
 from ...schemas import (
     WineCreateRequest,
     WineResponse,
@@ -19,6 +19,9 @@ from ...schemas import (
     WineType,
     WineQuantityUpdateRequest,
     InventoryLogResponse,
+    TastingNoteCreateRequest,
+    TastingNoteResponse,
+    WineConsumptionResponse,
 )
 from ...services.wine_api_service import fetch_drinking_window_suggestion, ExternalApiError, SupportedWineType
 
@@ -207,20 +210,21 @@ def update_wine_quantity(
                 detail=f"Quantity change would result in negative quantity. Current: {current_quantity}, Change: {payload.quantity_change}"
             )
         
-        # Use transaction to ensure atomicity
-        with db.begin():
-            # Update wine quantity
-            wine.quantity = new_quantity
-            
-            # Create inventory log entry
-            inventory_log = InventoryLog(
-                wine_id=wine_id,
-                change_type="manual_adjustment",
-                quantity_change=payload.quantity_change,
-                new_quantity=new_quantity,
-                notes=payload.notes
-            )
-            db.add(inventory_log)
+        # Update wine quantity
+        wine.quantity = new_quantity
+        
+        # Create inventory log entry
+        inventory_log = InventoryLog(
+            wine_id=wine_id,
+            change_type="manual_adjustment",
+            quantity_change=payload.quantity_change,
+            new_quantity=new_quantity,
+            notes=payload.notes
+        )
+        db.add(inventory_log)
+        
+        # Commit the changes to the database
+        db.commit()
         
         db.refresh(wine)
         
@@ -283,6 +287,121 @@ def get_wine_inventory_log(
             )
             for log in logs
         ]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@router.post("/{wine_id}/consume", response_model=WineConsumptionResponse)
+def consume_wine(
+    wine_id: int,
+    tasting_request: TastingNoteCreateRequest = None,
+    db: Session = Depends(get_db)
+) -> WineConsumptionResponse:
+    """
+    Record wine consumption by decrementing quantity by 1 and optionally creating a tasting note.
+    """
+    try:
+        # Find the wine
+        stmt = select(Wine).options(selectinload(Wine.grape_compositions)).where(Wine.id == wine_id)
+        wine = db.execute(stmt).scalar_one_or_none()
+        
+        if wine is None:
+            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        
+        # Check current quantity
+        current_quantity = wine.quantity or 0
+        if current_quantity <= 0:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST, 
+                detail="Cannot consume wine: quantity is already 0"
+            )
+        
+        new_quantity = current_quantity - 1
+        
+        # Update wine quantity
+        wine.quantity = new_quantity
+        
+        # Create inventory log entry
+        inventory_log = InventoryLog(
+            wine_id=wine_id,
+            change_type="consume",
+            quantity_change=-1,
+            new_quantity=new_quantity,
+            notes="Bottle consumed"
+        )
+        db.add(inventory_log)
+        
+        # Create tasting note if provided
+        tasting_note = None
+        if tasting_request and (tasting_request.rating is not None or tasting_request.notes):
+            # For now, use a placeholder user_id. In production, this would come from authentication
+            user_id = 1  # Placeholder user ID
+            
+            tasting_note = TastingNote(
+                wine_id=wine_id,
+                user_id=user_id,
+                rating=tasting_request.rating,
+                notes=tasting_request.notes
+            )
+            db.add(tasting_note)
+        
+        # Commit the changes to the database
+        db.commit()
+        
+        db.refresh(wine)
+        db.refresh(inventory_log)
+        if tasting_note:
+            db.refresh(tasting_note)
+        
+        # Build response
+        wine_response = WineResponse(
+            id=wine.id,
+            name=wine.name,
+            type=wine.type,
+            producer=wine.producer,
+            vintage=wine.vintage,
+            country=wine.country,
+            district=wine.district,
+            subdistrict=wine.subdistrict,
+            purchase_price=wine.purchase_price,
+            quantity=wine.quantity,
+            drink_after_date=wine.drink_after_date,
+            drink_before_date=wine.drink_before_date,
+            grape_composition=[
+                GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
+                for gc in (wine.grape_compositions or [])
+            ],
+        )
+        
+        inventory_log_response = InventoryLogResponse(
+            id=inventory_log.id,
+            wine_id=inventory_log.wine_id,
+            change_type=inventory_log.change_type,
+            quantity_change=inventory_log.quantity_change,
+            new_quantity=inventory_log.new_quantity,
+            notes=inventory_log.notes,
+            timestamp=inventory_log.timestamp
+        )
+        
+        tasting_note_response = None
+        if tasting_note:
+            tasting_note_response = TastingNoteResponse(
+                id=tasting_note.id,
+                wine_id=tasting_note.wine_id,
+                user_id=tasting_note.user_id,
+                rating=tasting_note.rating,
+                notes=tasting_note.notes,
+                timestamp=tasting_note.timestamp
+            )
+        
+        return WineConsumptionResponse(
+            wine=wine_response,
+            inventory_log=inventory_log_response,
+            tasting_note=tasting_note_response
+        )
+        
     except HTTPException:
         raise
     except Exception as exc:

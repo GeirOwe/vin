@@ -135,3 +135,26 @@ class InventoryLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TastingNoteCreateRequest(BaseModel):
+    rating: Optional[int] = Field(default=None, ge=1, le=10, description="Rating from 1 to 10")
+    notes: Optional[str] = Field(default=None, max_length=1000, description="Tasting notes")
+
+
+class TastingNoteResponse(BaseModel):
+    id: int
+    wine_id: int
+    user_id: int
+    rating: Optional[int] = None
+    notes: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class WineConsumptionResponse(BaseModel):
+    wine: WineResponse
+    inventory_log: InventoryLogResponse
+    tasting_note: Optional[TastingNoteResponse] = None

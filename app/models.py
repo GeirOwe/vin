@@ -32,6 +32,10 @@ class Wine(Base):
     inventory_logs: Mapped[List["InventoryLog"]] = relationship(
         back_populates="wine", cascade="all, delete-orphan"
     )
+    
+    tasting_notes: Mapped[List["TastingNote"]] = relationship(
+        back_populates="wine", cascade="all, delete-orphan"
+    )
 
 
 class GrapeComposition(Base):
@@ -57,3 +61,16 @@ class InventoryLog(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     wine: Mapped[Wine] = relationship(back_populates="inventory_logs")
+
+
+class TastingNote(Base):
+    __tablename__ = "tasting_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    wine_id: Mapped[int] = mapped_column(ForeignKey("wines.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # In production, this would be a proper user relationship
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Rating scale 1-10
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    wine: Mapped[Wine] = relationship(back_populates="tasting_notes")

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { useApi } from '../hooks/useApi'
 import { InventoryLogEntry, InventoryRefreshCallback, QuantityUpdateCallback } from '../types/inventory'
+import ConsumptionRecording from './ConsumptionRecording'
 import InventoryUpdateControls from './InventoryUpdateControls'
 
 interface InventoryTrackingSystemViewProps {
@@ -36,17 +37,14 @@ export default function InventoryTrackingSystemView({
     fetchInventoryLogs()
   }, [wineId])
 
-  // Update current quantity when inventory logs change
+  // Update inventory logs when data changes
   useEffect(() => {
     if (data && data.length > 0) {
-      // Get the most recent log entry (first in the array since API returns desc order)
-      const latestEntry = data[0]
-      setCurrentWineQuantity(latestEntry.new_quantity)
       setInventoryLogs(data)
     }
   }, [data])
 
-  // Update current quantity when prop changes
+  // Update current quantity when prop changes (this should take precedence)
   useEffect(() => {
     setCurrentWineQuantity(currentQuantity)
   }, [currentQuantity])
@@ -150,22 +148,26 @@ export default function InventoryTrackingSystemView({
           <CardTitle>Current Inventory</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-sm font-medium text-gray-600">Current Quantity</span>
+          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+            <div className="text-center">
+              <span className="text-sm font-medium text-gray-600">Available Bottles</span>
               <p className="text-2xl font-bold text-blue-600">{currentWineQuantity}</p>
             </div>
-            <InventoryUpdateControls
-              wineId={wineId}
-              currentQuantity={currentWineQuantity}
-              onQuantityUpdate={handleQuantityUpdate}
-            />
+            <div className="ml-4">
+              <InventoryUpdateControls
+                wineId={wineId}
+                currentQuantity={currentWineQuantity}
+                onQuantityUpdate={handleQuantityUpdate}
+              />
+            </div>
           </div>
           
-          {/* Placeholder for ConsumptionRecording component */}
-          <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center">
-            <p className="text-sm text-gray-500">Consumption Recording Component (Future Implementation)</p>
-          </div>
+          {/* Consumption Recording Component */}
+          <ConsumptionRecording
+            wineId={wineId}
+            currentQuantity={currentWineQuantity}
+            onConsumptionSuccess={handleQuantityUpdate}
+          />
         </CardContent>
       </Card>
 
