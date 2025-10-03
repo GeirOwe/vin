@@ -13,7 +13,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />,
     children: [
-      { index: true, element: <WineCollectionListView /> },
+      { index: true, element: <WineCollectionListView showSearchAndSort={true} /> },
       { path: 'add-wine', element: <WineEntryForm /> },
       { path: 'wines/:id', element: <WineDetailView /> },
       { path: 'drinking-window', element: <DrinkingWindowMonitoringView /> },
