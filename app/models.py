@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import List
 
-from sqlalchemy import Date, Float, ForeignKey, Integer, String
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -28,6 +28,10 @@ class Wine(Base):
     grape_compositions: Mapped[List["GrapeComposition"]] = relationship(
         back_populates="wine", cascade="all, delete-orphan"
     )
+    
+    inventory_logs: Mapped[List["InventoryLog"]] = relationship(
+        back_populates="wine", cascade="all, delete-orphan"
+    )
 
 
 class GrapeComposition(Base):
@@ -39,3 +43,17 @@ class GrapeComposition(Base):
     percentage: Mapped[float] = mapped_column(Float, nullable=False)
 
     wine: Mapped[Wine] = relationship(back_populates="grape_compositions")
+
+
+class InventoryLog(Base):
+    __tablename__ = "inventory_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    wine_id: Mapped[int] = mapped_column(ForeignKey("wines.id", ondelete="CASCADE"), nullable=False, index=True)
+    change_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    quantity_change: Mapped[int] = mapped_column(Integer, nullable=False)
+    new_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    wine: Mapped[Wine] = relationship(back_populates="inventory_logs")

@@ -1,0 +1,165 @@
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Wine } from '../types/wine'
+import InventoryUpdateControls from './InventoryUpdateControls'
+import InventoryTrackingSystemView from './InventoryTrackingSystemView'
+
+interface WineInformationDisplayProps {
+  wine: Wine
+  onQuantityUpdate?: (newQuantity: number) => void
+  showInventoryTracking?: boolean
+}
+
+export default function WineInformationDisplay({ wine, onQuantityUpdate, showInventoryTracking = false }: WineInformationDisplayProps) {
+  const formatPrice = (price: number | null | undefined): string => {
+    if (price === null || price === undefined) return '—'
+    return `$${price.toFixed(2)}`
+  }
+
+  const formatDate = (date: string | null | undefined): string => {
+    if (!date) return '—'
+    try {
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    } catch {
+      return date
+    }
+  }
+
+  const formatDrinkingWindow = (afterDate?: string | null, beforeDate?: string | null): string => {
+    const after = formatDate(afterDate)
+    const before = formatDate(beforeDate)
+    
+    if (after === '—' && before === '—') return '—'
+    if (after === '—') return `Before ${before}`
+    if (before === '—') return `After ${after}`
+    return `${after} to ${before}`
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Core Wine Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl sm:text-2xl">{wine.name}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <span className="text-sm font-medium text-gray-600">Producer</span>
+              <p className="text-base">{wine.producer || '—'}</p>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-600">Type</span>
+              <p className="text-base">{wine.type || '—'}</p>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-600">Vintage</span>
+              <p className="text-base">{wine.vintage || '—'}</p>
+            </div>
+            <InventoryUpdateControls
+              wineId={wine.id}
+              currentQuantity={wine.quantity || 0}
+              onQuantityUpdate={onQuantityUpdate}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Geographic Origin */}
+      {(wine.country || wine.district || wine.subdistrict) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Origin</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div>
+              <span className="text-sm font-medium text-gray-600">Country</span>
+              <p className="text-base">{wine.country || '—'}</p>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-600">District</span>
+              <p className="text-base">{wine.district || '—'}</p>
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-600">Subdistrict</span>
+              <p className="text-base">{wine.subdistrict || '—'}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pricing */}
+      {wine.purchase_price && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Pricing</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div>
+              <span className="text-sm font-medium text-gray-600">Purchase Price</span>
+              <p className="text-lg font-semibold text-green-600">{formatPrice(wine.purchase_price)}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Drinking Window */}
+      {(wine.drink_after_date || wine.drink_before_date) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Drinking Window</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div>
+                <span className="text-sm font-medium text-gray-600">Recommended Period</span>
+                <p className="text-base">{formatDrinkingWindow(wine.drink_after_date, wine.drink_before_date)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Grape Composition */}
+      {wine.grape_composition && wine.grape_composition.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Grape Composition</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {wine.grape_composition.map((grape) => (
+                <div key={grape.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                  <span className="font-medium">{grape.grape_variety}</span>
+                  <span className="text-sm bg-gray-100 px-2 py-1 rounded-full">
+                    {grape.percentage}%
+                  </span>
+                </div>
+              ))}
+              <div className="pt-2 mt-2 border-t border-gray-200">
+                <div className="flex justify-between items-center font-medium">
+                  <span>Total</span>
+                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    {wine.grape_composition.reduce((sum, grape) => sum + grape.percentage, 0)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Inventory Tracking System */}
+      {showInventoryTracking && (
+        <InventoryTrackingSystemView
+          wineId={wine.id}
+          currentQuantity={wine.quantity || 0}
+          onQuantityUpdate={onQuantityUpdate}
+        />
+      )}
+    </div>
+  )
+}

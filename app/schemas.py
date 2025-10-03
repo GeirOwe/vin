@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
 from typing import List, Optional, Literal
 
@@ -117,3 +117,21 @@ class WineListPageResponse(BaseModel):
     page_size: int
     total_items: int
     total_pages: int
+
+
+class WineQuantityUpdateRequest(BaseModel):
+    quantity_change: int = Field(description="Change in quantity (positive for increase, negative for decrease)")
+    notes: Optional[str] = Field(default=None, max_length=500, description="Optional notes about the inventory change")
+
+
+class InventoryLogResponse(BaseModel):
+    id: int
+    wine_id: int
+    change_type: str
+    quantity_change: int
+    new_quantity: int
+    notes: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True

@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session, selectinload
 
 from ...database import get_db, engine, Base
-from ...models import Wine, GrapeComposition
+from ...models import Wine, GrapeComposition, InventoryLog
 from ...schemas import (
     WineCreateRequest,
     WineResponse,
@@ -17,6 +17,8 @@ from ...schemas import (
     WineListPageResponse,
     WineListItem,
     WineType,
+    WineQuantityUpdateRequest,
+    InventoryLogResponse,
 )
 from ...services.wine_api_service import fetch_drinking_window_suggestion, ExternalApiError, SupportedWineType
 
@@ -145,6 +147,146 @@ def list_wines_page(
         return WineListPageResponse(items=items, page=page, page_size=page_size, total_items=total_items, total_pages=total_pages)
     except Exception as exc:
         raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail=str(exc))
+
+
+@router.get("/{wine_id}", response_model=WineResponse)
+def get_wine(wine_id: int, db: Session = Depends(get_db)) -> WineResponse:
+    try:
+        stmt = select(Wine).options(selectinload(Wine.grape_compositions)).where(Wine.id == wine_id)
+        wine = db.execute(stmt).scalar_one_or_none()
+        
+        if wine is None:
+            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        
+        return WineResponse(
+            id=wine.id,
+            name=wine.name,
+            type=wine.type,
+            producer=wine.producer,
+            vintage=wine.vintage,
+            country=wine.country,
+            district=wine.district,
+            subdistrict=wine.subdistrict,
+            purchase_price=wine.purchase_price,
+            quantity=wine.quantity,
+            drink_after_date=wine.drink_after_date,
+            drink_before_date=wine.drink_before_date,
+            grape_composition=[
+                GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
+                for gc in (wine.grape_compositions or [])
+            ],
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@router.patch("/{wine_id}/quantity", response_model=WineResponse)
+def update_wine_quantity(
+    wine_id: int, 
+    payload: WineQuantityUpdateRequest,
+    db: Session = Depends(get_db)
+) -> WineResponse:
+    try:
+        # Find the wine
+        stmt = select(Wine).options(selectinload(Wine.grape_compositions)).where(Wine.id == wine_id)
+        wine = db.execute(stmt).scalar_one_or_none()
+        
+        if wine is None:
+            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        
+        # Calculate new quantity
+        current_quantity = wine.quantity or 0
+        new_quantity = current_quantity + payload.quantity_change
+        
+        # Validate new quantity
+        if new_quantity < 0:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST, 
+                detail=f"Quantity change would result in negative quantity. Current: {current_quantity}, Change: {payload.quantity_change}"
+            )
+        
+        # Use transaction to ensure atomicity
+        with db.begin():
+            # Update wine quantity
+            wine.quantity = new_quantity
+            
+            # Create inventory log entry
+            inventory_log = InventoryLog(
+                wine_id=wine_id,
+                change_type="manual_adjustment",
+                quantity_change=payload.quantity_change,
+                new_quantity=new_quantity,
+                notes=payload.notes
+            )
+            db.add(inventory_log)
+        
+        db.refresh(wine)
+        
+        return WineResponse(
+            id=wine.id,
+            name=wine.name,
+            type=wine.type,
+            producer=wine.producer,
+            vintage=wine.vintage,
+            country=wine.country,
+            district=wine.district,
+            subdistrict=wine.subdistrict,
+            purchase_price=wine.purchase_price,
+            quantity=wine.quantity,
+            drink_after_date=wine.drink_after_date,
+            drink_before_date=wine.drink_before_date,
+            grape_composition=[
+                GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
+                for gc in (wine.grape_compositions or [])
+            ],
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@router.get("/{wine_id}/inventory-log", response_model=List[InventoryLogResponse])
+def get_wine_inventory_log(
+    wine_id: int,
+    db: Session = Depends(get_db)
+) -> List[InventoryLogResponse]:
+    """
+    Retrieve inventory change history for a specific wine.
+    Returns inventory log entries ordered by timestamp descending (most recent first).
+    """
+    try:
+        # Verify wine exists
+        wine = db.execute(select(Wine).where(Wine.id == wine_id)).scalar_one_or_none()
+        if wine is None:
+            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        
+        # Get inventory logs for the wine, ordered by timestamp descending
+        stmt = (
+            select(InventoryLog)
+            .where(InventoryLog.wine_id == wine_id)
+            .order_by(InventoryLog.timestamp.desc())
+        )
+        logs = db.execute(stmt).scalars().all()
+        
+        return [
+            InventoryLogResponse(
+                id=log.id,
+                wine_id=log.wine_id,
+                change_type=log.change_type,
+                quantity_change=log.quantity_change,
+                new_quantity=log.new_quantity,
+                notes=log.notes,
+                timestamp=log.timestamp
+            )
+            for log in logs
+        ]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc))
 
 
 @router.get("/drinking-window-suggestions", response_model=DrinkingWindowSuggestionResponse)
