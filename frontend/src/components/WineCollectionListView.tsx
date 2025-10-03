@@ -1,104 +1,107 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useApi } from '../hooks/useApi'
-import { Input } from './ui/input'
-import { Button } from './ui/button'
-import WineEntryDisplayCard from './WineEntryDisplayCard'
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Wine } from '../types/wine'
+import { DrinkingWindowStatus } from '../types/wine'
+import { useApi } from '../hooks/useApi'
+import WineEntryDisplayCard from './WineEntryDisplayCard'
 
-// Minimal types based on backend WineListPageResponse
-type Grape = { id: number; grape_variety: string; percentage: number }
-interface WineItem { id: number; name: string; producer?: string | null; vintage?: number | null; type?: string | null; grape_composition: Grape[]; quantity?: number | null }
-interface PageResp { items: WineItem[]; page: number; page_size: number; total_items: number; total_pages: number }
+interface WineCollectionListViewProps {
+  title?: string
+  filterParams?: {
+    search_term?: string
+    wine_type?: string
+    vintage?: number
+    country?: string
+    district?: string
+    subdistrict?: string
+    drinking_window_status?: DrinkingWindowStatus
+  }
+  emptyStateMessage?: string
+}
 
-export default function WineCollectionListView() {
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
-  const [sortBy, setSortBy] = useState<'id'|'name'|'producer'|'vintage'|'type'>('id')
-  const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('desc')
-  const [query, setQuery] = useState('')
-
-  const { loading, error, data, getJson } = useApi<PageResp>()
+export default function WineCollectionListView({ 
+  title = "Wine Collection", 
+  filterParams = {},
+  emptyStateMessage = "No wines found matching the current filters."
+}: WineCollectionListViewProps) {
+  const { loading, error, data, getJson } = useApi<Wine[]>()
   const navigate = useNavigate()
 
-  const url = useMemo(() => {
-    const u = new URL('http://localhost:8000/api/wines/page')
-    u.searchParams.set('page', String(page))
-    u.searchParams.set('page_size', String(pageSize))
-    u.searchParams.set('sort_by', sortBy)
-    u.searchParams.set('sort_order', sortOrder)
-    return u.toString()
-  }, [page, pageSize, sortBy, sortOrder])
+  const handleWineClick = (wineId: number) => {
+    navigate(`/wines/${wineId}`)
+  }
 
   useEffect(() => {
+    // Build query parameters
+    const queryParams = new URLSearchParams()
+    
+    Object.entries(filterParams).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, value.toString())
+      }
+    })
+
+    const queryString = queryParams.toString()
+    const url = queryString 
+      ? `http://localhost:8000/api/wines?${queryString}`
+      : 'http://localhost:8000/api/wines'
+
     getJson(url)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url])
+  }, [getJson, JSON.stringify(filterParams)])
 
-  const items = (data?.items ?? []).filter(w => {
-    if (!query.trim()) return true
-    const q = query.toLowerCase()
+  if (loading) {
     return (
-      w.name.toLowerCase().includes(q) ||
-      (w.producer || '').toLowerCase().includes(q) ||
-      String(w.vintage || '').includes(q) ||
-      (w.type || '').toLowerCase().includes(q)
+      <div className="p-4">
+        <h2 className="text-xl font-semibold mb-4">{title}</h2>
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-gray-600">Loading wines...</p>
+        </div>
+      </div>
     )
-  })
+  }
 
-  const openDetail = (id: number) => {
-    navigate(`/wines/${id}`)
+  if (error) {
+    return (
+      <div className="p-4">
+        <h2 className="text-xl font-semibold mb-4">{title}</h2>
+        <div className="text-center py-8">
+          <div className="text-red-600 mb-2">⚠️ Error loading wines</div>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="p-4">
+        <h2 className="text-xl font-semibold mb-4">{title}</h2>
+        <div className="text-center py-8">
+          <div className="text-gray-400 mb-2">🍷</div>
+          <p className="text-gray-600">{emptyStateMessage}</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Input placeholder="Search wines…" value={query} onChange={e => setQuery(e.target.value)} className="w-64" />
-          <Button onClick={() => setPage(1)}>Search</Button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 text-sm">
-        <label className="flex items-center gap-1">Sort by
-          <select className="border rounded px-2 py-1" value={sortBy} onChange={e => setSortBy(e.target.value as any)}>
-            <option value="id">ID</option>
-            <option value="name">Name</option>
-            <option value="producer">Producer</option>
-            <option value="vintage">Vintage</option>
-            <option value="type">Type</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-1">Order
-          <select className="border rounded px-2 py-1" value={sortOrder} onChange={e => setSortOrder(e.target.value as any)}>
-            <option value="desc">Desc</option>
-            <option value="asc">Asc</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-1">Page size
-          <select className="border rounded px-2 py-1" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-          </select>
-        </label>
-      </div>
-
-      {loading ? <div className="p-4">Loading…</div> : null}
-      {error ? <div className="p-4 text-red-600">{error}</div> : null}
-      {!loading && !error && items.length === 0 ? <div className="p-4 text-gray-600">No wines found.</div> : null}
-
-      <div className="grid gap-3">
-        {items.map(w => (
-          <WineEntryDisplayCard key={w.id} wine={{ id: w.id, name: w.name, producer: w.producer, vintage: w.vintage, quantity: w.quantity }} onClick={openDetail} />
+    <div className="p-4">
+      <h2 className="text-xl font-semibold mb-4">{title}</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {data.map((wine) => (
+          <WineEntryDisplayCard
+            key={wine.id}
+            wine={wine}
+            onClick={handleWineClick}
+          />
         ))}
       </div>
-
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">Page {data?.page || page} of {data?.total_pages || 1} · Total {data?.total_items || 0}</div>
-        <div className="flex gap-2">
-          <Button disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))}>Previous</Button>
-          <Button disabled={(data?.page || page) >= (data?.total_pages || 1) || loading} onClick={() => setPage(p => p + 1)}>Next</Button>
-        </div>
+      
+      <div className="mt-4 text-sm text-gray-500 text-center">
+        Showing {data.length} wine{data.length !== 1 ? 's' : ''}
       </div>
     </div>
   )

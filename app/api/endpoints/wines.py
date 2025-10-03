@@ -32,7 +32,7 @@ Base.metadata.create_all(bind=engine)
 router = APIRouter(prefix="/api/wines", tags=["wines"])
 
 
-def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType], vintage: Optional[int], country: Optional[str], district: Optional[str], subdistrict: Optional[str]):
+def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType], vintage: Optional[int], country: Optional[str], district: Optional[str], subdistrict: Optional[str], drinking_window_status: Optional[str] = None):
     if search_term:
         like = f"%{search_term}%"
         stmt = stmt.filter((Wine.name.ilike(like)) | (Wine.producer.ilike(like)))
@@ -46,6 +46,29 @@ def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType
         stmt = stmt.filter(Wine.district == district)
     if subdistrict:
         stmt = stmt.filter(Wine.subdistrict == subdistrict)
+    
+    # Drinking window status filtering
+    if drinking_window_status:
+        from datetime import date, timedelta
+        today = date.today()
+        
+        if drinking_window_status == "ready_to_drink":
+            # Wines where today is between drink_after_date and drink_before_date
+            stmt = stmt.filter(
+                Wine.drink_after_date <= today,
+                Wine.drink_before_date >= today
+            )
+        elif drinking_window_status == "approaching_deadline":
+            # Wines where drink_before_date is within 30 days of today
+            deadline_threshold = today + timedelta(days=30)
+            stmt = stmt.filter(
+                Wine.drink_before_date <= deadline_threshold,
+                Wine.drink_before_date >= today
+            )
+        elif drinking_window_status == "not_ready":
+            # Wines where today is before drink_after_date
+            stmt = stmt.filter(Wine.drink_after_date > today)
+    
     return stmt
 
 
@@ -58,10 +81,11 @@ def list_wines(
     country: Optional[str] = Query(None),
     district: Optional[str] = Query(None),
     subdistrict: Optional[str] = Query(None),
+    drinking_window_status: Optional[str] = Query(None),
 ) -> List[WineResponse]:
     try:
         stmt = select(Wine).options(selectinload(Wine.grape_compositions)).order_by(Wine.id.desc())
-        stmt = apply_filters(stmt, search_term, wine_type, vintage, country, district, subdistrict)
+        stmt = apply_filters(stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
         wines = db.execute(stmt).scalars().all()
         return [
             WineResponse(
@@ -101,11 +125,12 @@ def list_wines_page(
     country: Optional[str] = Query(None),
     district: Optional[str] = Query(None),
     subdistrict: Optional[str] = Query(None),
+    drinking_window_status: Optional[str] = Query(None),
 ) -> WineListPageResponse:
     try:
         # Base query with eager load to prevent N+1
         base_stmt = select(Wine).options(selectinload(Wine.grape_compositions))
-        base_stmt = apply_filters(base_stmt, search_term, wine_type, vintage, country, district, subdistrict)
+        base_stmt = apply_filters(base_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
 
         # Sorting
         sort_field = {

@@ -23,3 +23,5 @@ export interface Wine {
 }
 
 export type WineType = 'Red' | 'White' | 'Rose' | 'Sparkling' | 'Dessert' | 'Fortified'
+
+export type DrinkingWindowStatus = 'ready_to_drink' | 'approaching_deadline' | 'not_ready'

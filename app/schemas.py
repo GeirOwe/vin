@@ -86,6 +86,7 @@ class WineFilterParameters(BaseModel):
     country: Optional[str] = None
     district: Optional[str] = None
     subdistrict: Optional[str] = None
+    drinking_window_status: Optional[Literal["ready_to_drink", "approaching_deadline", "not_ready"]] = None
 
 
 class PaginationParams(BaseModel):
