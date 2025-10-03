@@ -29,8 +29,8 @@ class WineCreateRequest(BaseModel):
     @model_validator(mode="after")
     def validate_dates_and_grapes(self) -> "WineCreateRequest":
         if self.drink_after_date and self.drink_before_date:
-            if self.drink_after_date > self.drink_before_date:
-                raise ValueError("drink_after_date must be before or equal to drink_before_date")
+            if self.drink_after_date >= self.drink_before_date:
+                raise ValueError("drink_before_date must be later than drink_after_date")
         if self.grape_composition and len(self.grape_composition) > 0:
             total = sum(gc.percentage for gc in self.grape_composition)
             if abs(total - 100.0) > 0.5:
@@ -61,3 +61,8 @@ class WineResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DrinkingWindowSuggestionResponse(BaseModel):
+    drink_after_date: date
+    drink_before_date: date

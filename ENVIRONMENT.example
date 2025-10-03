@@ -1,0 +1,3 @@
+# External wine API configuration
+EXTERNAL_WINE_API_BASE_URL=https://api.example-wine.com
+EXTERNAL_WINE_API_KEY=your_api_key_here
