@@ -11,6 +11,7 @@ from ...database import get_db, engine, Base
 from ...models import Wine, GrapeComposition, InventoryLog, TastingNote
 from ...schemas import (
     WineCreateRequest,
+    WineUpdateRequest,
     WineResponse,
     GrapeCompositionResponse,
     DrinkingWindowSuggestionResponse,
@@ -185,6 +186,53 @@ def get_wine(wine_id: int, db: Session = Depends(get_db)) -> WineResponse:
         
         if wine is None:
             raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        
+        return WineResponse(
+            id=wine.id,
+            name=wine.name,
+            type=wine.type,
+            producer=wine.producer,
+            vintage=wine.vintage,
+            country=wine.country,
+            district=wine.district,
+            subdistrict=wine.subdistrict,
+            purchase_price=wine.purchase_price,
+            quantity=wine.quantity,
+            drink_after_date=wine.drink_after_date,
+            drink_before_date=wine.drink_before_date,
+            grape_composition=[
+                GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
+                for gc in (wine.grape_compositions or [])
+            ],
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@router.patch("/{wine_id}", response_model=WineResponse)
+def update_wine(
+    wine_id: int, 
+    payload: WineUpdateRequest,
+    db: Session = Depends(get_db)
+) -> WineResponse:
+    try:
+        # Get the wine
+        stmt = select(Wine).where(Wine.id == wine_id)
+        wine = db.execute(stmt).scalar_one_or_none()
+        
+        if wine is None:
+            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        
+        # Update fields if provided
+        update_data = payload.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(wine, field, value)
+        
+        # Commit changes
+        db.commit()
+        db.refresh(wine)
         
         return WineResponse(
             id=wine.id,

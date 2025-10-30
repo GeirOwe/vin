@@ -1,17 +1,53 @@
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
 import { Wine } from '../types/wine'
+import { useApi } from '../hooks/useApi'
 import InventoryTrackingSystemView from './InventoryTrackingSystemView'
 
 interface WineInformationDisplayProps {
   wine: Wine
   onQuantityUpdate?: (newQuantity: number) => void
+  onWineUpdate?: () => void
   showInventoryTracking?: boolean
 }
 
-export default function WineInformationDisplay({ wine, onQuantityUpdate, showInventoryTracking = false }: WineInformationDisplayProps) {
+export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineUpdate, showInventoryTracking = false }: WineInformationDisplayProps) {
+  const [isEditingDrinkingWindow, setIsEditingDrinkingWindow] = useState(false)
+  const [drinkAfterDate, setDrinkAfterDate] = useState(wine.drink_after_date || '')
+  const [drinkBeforeDate, setDrinkBeforeDate] = useState(wine.drink_before_date || '')
+  const [isSaving, setIsSaving] = useState(false)
+  
+  const { patchJson } = useApi()
+
   const formatPrice = (price: number | null | undefined): string => {
     if (price === null || price === undefined) return '—'
     return `$${price.toFixed(2)}`
+  }
+
+  const handleSaveDrinkingWindow = async () => {
+    setIsSaving(true)
+    try {
+      const updateData: any = {}
+      if (drinkAfterDate) updateData.drink_after_date = drinkAfterDate
+      if (drinkBeforeDate) updateData.drink_before_date = drinkBeforeDate
+      
+      await patchJson(`http://localhost:8000/api/wines/${wine.id}`, updateData)
+      setIsEditingDrinkingWindow(false)
+      // Refresh the wine data in the parent component
+      onWineUpdate?.()
+    } catch (error) {
+      console.error('Failed to update drinking window:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setDrinkAfterDate(wine.drink_after_date || '')
+    setDrinkBeforeDate(wine.drink_before_date || '')
+    setIsEditingDrinkingWindow(false)
   }
 
   const formatDate = (date: string | null | undefined): string => {
@@ -105,18 +141,72 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, showInv
       )}
 
       {/* Drinking Window */}
-      {(wine.drink_after_date || wine.drink_before_date) && (
+      {(wine.drink_after_date || wine.drink_before_date || isEditingDrinkingWindow) && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Drinking Window</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Drinking Window</CardTitle>
+              {!isEditingDrinkingWindow && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditingDrinkingWindow(true)}
+                >
+                  Edit
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div>
-                <span className="text-sm font-medium text-gray-600">Recommended Period</span>
-                <p className="text-base">{formatDrinkingWindow(wine.drink_after_date, wine.drink_before_date)}</p>
+            {isEditingDrinkingWindow ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    Drink After Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={drinkAfterDate}
+                    onChange={(e) => setDrinkAfterDate(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    Drink Before Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={drinkBeforeDate}
+                    onChange={(e) => setDrinkBeforeDate(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSaveDrinkingWindow}
+                    disabled={isSaving}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <div>
+                  <span className="text-sm font-medium text-gray-600">Recommended Period</span>
+                  <p className="text-base">{formatDrinkingWindow(wine.drink_after_date, wine.drink_before_date)}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

@@ -43,7 +43,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Run Backend Server
+### Run Backend Server (in the Terminal in cursor)
 ```bash
 # Default port 8000
 uvicorn app.main:app --reload --port 8000
@@ -52,7 +52,7 @@ uvicorn app.main:app --reload --port 8000
 uvicorn app.main:app --reload --port 8001
 ```
 
-### Frontend Setup & Run
+### Frontend Setup & Run (in a separate Terminal window)
 ```bash
 cd frontend
 npm install
@@ -60,6 +60,12 @@ npm run dev
 ```
 
 This starts the frontend on `http://localhost:5173`.
+
+### To stop servers
+Ctrl+C in each terminal. If a previous background server is stuck, free port 8000:
+```bash
+lsof -ti tcp:8000 | xargs kill -9
+```
 
 ## 📱 User Interface
 

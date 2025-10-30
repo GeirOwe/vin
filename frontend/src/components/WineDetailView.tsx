@@ -15,6 +15,13 @@ export default function WineDetailView() {
     }
   }
 
+  const handleWineUpdate = () => {
+    // Refresh wine data after any wine update
+    if (id) {
+      getJson(`http://localhost:8000/api/wines/${id}`)
+    }
+  }
+
   useEffect(() => {
     if (id) {
       getJson(`http://localhost:8000/api/wines/${id}`)
@@ -34,6 +41,7 @@ export default function WineDetailView() {
       <WineInformationDisplay 
         wine={data} 
         onQuantityUpdate={handleQuantityUpdate}
+        onWineUpdate={handleWineUpdate}
         showInventoryTracking={true}
       />
     </div>

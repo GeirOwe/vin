@@ -3,7 +3,16 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import List
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    CheckConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -11,6 +20,14 @@ from .database import Base
 
 class Wine(Base):
     __tablename__ = "wines"
+    __table_args__ = (
+        CheckConstraint("quantity IS NULL OR quantity >= 0", name="ck_wines_quantity_non_negative"),
+        CheckConstraint("purchase_price IS NULL OR purchase_price >= 0", name="ck_wines_price_non_negative"),
+        CheckConstraint(
+            "(drink_after_date IS NULL OR drink_before_date IS NULL) OR (drink_after_date < drink_before_date)",
+            name="ck_wines_drinking_window_order",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -40,6 +57,9 @@ class Wine(Base):
 
 class GrapeComposition(Base):
     __tablename__ = "grape_compositions"
+    __table_args__ = (
+        CheckConstraint("percentage >= 0 AND percentage <= 100", name="ck_grapes_percentage_range"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     wine_id: Mapped[int] = mapped_column(ForeignKey("wines.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -65,6 +85,9 @@ class InventoryLog(Base):
 
 class TastingNote(Base):
     __tablename__ = "tasting_notes"
+    __table_args__ = (
+        CheckConstraint("rating IS NULL OR (rating >= 1 AND rating <= 10)", name="ck_notes_rating_range"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     wine_id: Mapped[int] = mapped_column(ForeignKey("wines.id", ondelete="CASCADE"), nullable=False, index=True)

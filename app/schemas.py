@@ -14,7 +14,7 @@ class GrapeCompositionSchema(BaseModel):
 
 class WineCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
-    type: Optional[str] = Field(default=None, max_length=100)
+    type: Optional["WineType"] = Field(default=None)
     producer: Optional[str] = Field(default=None, max_length=255)
     vintage: Optional[int] = Field(default=None, ge=1800, le=2100)
     country: Optional[str] = Field(default=None, max_length=100)
@@ -36,6 +36,31 @@ class WineCreateRequest(BaseModel):
             total = sum(gc.percentage for gc in self.grape_composition)
             if abs(total - 100.0) > 0.5:
                 raise ValueError("Sum of grape composition percentages must be approximately 100 (±0.5)")
+            # Enforce unique grape varieties in the composition
+            varieties = [gc.grape_variety.strip().lower() for gc in self.grape_composition]
+            if len(set(varieties)) != len(varieties):
+                raise ValueError("Duplicate grape varieties are not allowed in grape_composition")
+        return self
+
+
+class WineUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    type: Optional["WineType"] = Field(default=None)
+    producer: Optional[str] = Field(default=None, max_length=255)
+    vintage: Optional[int] = Field(default=None, ge=1800, le=2100)
+    country: Optional[str] = Field(default=None, max_length=100)
+    district: Optional[str] = Field(default=None, max_length=100)
+    subdistrict: Optional[str] = Field(default=None, max_length=100)
+    purchase_price: Optional[float] = Field(default=None, ge=0)
+    quantity: Optional[int] = Field(default=None, ge=0)
+    drink_after_date: Optional[date] = None
+    drink_before_date: Optional[date] = None
+
+    @model_validator(mode="after")
+    def validate_dates(self) -> "WineUpdateRequest":
+        if self.drink_after_date and self.drink_before_date:
+            if self.drink_after_date >= self.drink_before_date:
+                raise ValueError("drink_before_date must be later than drink_after_date")
         return self
 
 
@@ -48,7 +73,7 @@ class GrapeCompositionResponse(BaseModel):
 class WineResponse(BaseModel):
     id: int
     name: str
-    type: Optional[str]
+    type: Optional["WineType"]
     producer: Optional[str]
     vintage: Optional[int]
     country: Optional[str]
@@ -104,7 +129,7 @@ class WineListItem(BaseModel):
     name: str
     producer: Optional[str]
     vintage: Optional[int]
-    type: Optional[str]
+    type: Optional["WineType"]
     quantity: Optional[int] = None
     grape_composition: List[GrapeCompositionResponse] = []
 
