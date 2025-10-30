@@ -220,6 +220,59 @@ uvicorn app.main:app --reload --port 8001
 cd frontend && rm -rf node_modules package-lock.json && npm install
 ```
 
+## ☁️ Deploying to Render
+
+Follow these exact steps to deploy both backend (FastAPI) and frontend (Vite) on Render.
+
+### Backend (FastAPI)
+- Create a Web Service
+  - Repository: connect this GitHub repo (root = repo root)
+  - Runtime: Python
+  - Build command: `pip install -r requirements.txt`
+  - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+  - Health check path: `/health`
+  - Auto Deploy: On (recommended)
+
+- Environment variables
+  - Choose ONE database option:
+    - SQLite + Persistent Disk (simple)
+      - Add Disk: size ≥ 1 GB, Mount Path: `/data`
+      - `DATABASE_URL=sqlite:////data/vin.db`
+      - Note: do not scale to multiple instances with SQLite.
+    - PostgreSQL (recommended for production)
+      - Create Render PostgreSQL
+      - `DATABASE_URL=<Render-provided-URL>`
+  - CORS (allow your frontend):
+    - `CORS_ORIGINS=https://YOUR-FRONTEND-URL.onrender.com`
+
+- Deploy and verify
+  - Visit: `https://YOUR-BACKEND-URL.onrender.com/health`
+  - Should return: `{ "status": "ok" }`
+
+### Frontend (Vite + React)
+- Create a Static Site
+  - Root Directory: `frontend`
+  - Build Command: `npm ci && npm run build`
+  - Publish Directory: `dist`
+  - Auto Deploy: On (recommended)
+
+- Environment variables
+  - Backend base URL for the frontend:
+    - `VITE_API_BASE=https://YOUR-BACKEND-URL.onrender.com`
+
+- Deploy and verify
+  - Open your frontend URL
+  - If you see CORS errors, ensure the backend `CORS_ORIGINS` includes your exact frontend URL (scheme + domain)
+
+### Order of Operations
+1. Deploy Backend → copy its URL
+2. Set `VITE_API_BASE` on Frontend to that URL → deploy Frontend
+3. Ensure `CORS_ORIGINS` on Backend includes your Frontend URL
+
+### Notes
+- The frontend now uses `VITE_API_BASE` automatically via `useApi`, so no code changes are needed between local and Render.
+- For local development, `VITE_API_BASE` defaults to `http://localhost:8000`.
+
 ## 🏗️ Tech Stack
 
 ### **Backend**
