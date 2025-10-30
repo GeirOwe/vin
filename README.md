@@ -295,7 +295,7 @@ vin/
 
 ## 📄 License
 
-Internal project - add appropriate license as needed.
+MIT License
 
 ---
 
