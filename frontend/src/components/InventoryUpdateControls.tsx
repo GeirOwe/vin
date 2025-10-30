@@ -1,161 +1,56 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from './ui/button'
-import { Input } from './ui/input'
 import { useApi } from '../hooks/useApi'
 
-interface InventoryUpdateControlsProps {
+interface Props {
   wineId: number
   currentQuantity: number
-  onQuantityUpdate?: (newQuantity: number) => void
+  onQuantityUpdated?: (newQuantity: number) => void
 }
 
-export default function InventoryUpdateControls({ 
-  wineId, 
-  currentQuantity, 
-  onQuantityUpdate 
-}: InventoryUpdateControlsProps) {
-  const [displayQuantity, setDisplayQuantity] = useState(currentQuantity)
-  const [inputValue, setInputValue] = useState(currentQuantity.toString())
-  const [showSuccess, setShowSuccess] = useState(false)
-  const { loading, error, patchJson } = useApi()
+export default function InventoryUpdateControls({ wineId, currentQuantity, onQuantityUpdated }: Props) {
+  const [quantity, setQuantity] = useState<number>(currentQuantity)
+  const [pendingQuantity, setPendingQuantity] = useState<number>(currentQuantity)
+  const [isSaving, setIsSaving] = useState<boolean>(false)
+  const { patchJson } = useApi<any>()
 
-  // Update display quantity when currentQuantity prop changes
   useEffect(() => {
-    setDisplayQuantity(currentQuantity)
-    setInputValue(currentQuantity.toString())
+    setQuantity(currentQuantity)
+    setPendingQuantity(currentQuantity)
   }, [currentQuantity])
 
-  // Debounced input handler
-  const debouncedUpdate = useCallback(
-    debounce((newQuantity: number) => {
-      updateQuantity(newQuantity)
-    }, 500),
-    [wineId]
-  )
+  const canSave = useMemo(() => pendingQuantity !== quantity, [pendingQuantity, quantity])
 
-  // Handle input changes with debouncing
-  useEffect(() => {
-    const numericValue = parseInt(inputValue)
-    if (!isNaN(numericValue) && numericValue !== displayQuantity && numericValue >= 0) {
-      debouncedUpdate(numericValue)
+  const submitChange = useCallback(async () => {
+    if (!canSave) return
+    setIsSaving(true)
+    try {
+      const quantity_change = pendingQuantity - quantity
+      const result = await patchJson(`/api/wines/${wineId}/quantity`, {
+        quantity_change,
+        notes: undefined,
+      })
+      if (result && typeof result.quantity === 'number') {
+        onQuantityUpdated?.(result.quantity)
+      }
+    } catch (e) {
+      console.error('Failed to update quantity', e)
+    } finally {
+      setIsSaving(false)
     }
-  }, [inputValue, displayQuantity, debouncedUpdate])
-
-  const updateQuantity = async (newQuantity: number) => {
-    if (newQuantity < 0) return
-
-    const quantityChange = newQuantity - currentQuantity
-    const result = await patchJson(`http://localhost:8000/api/wines/${wineId}/quantity`, {
-      quantity_change: quantityChange
-    })
-
-    if (result) {
-      setDisplayQuantity(newQuantity)
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 2000)
-      onQuantityUpdate?.(newQuantity)
-    }
-  }
-
-  const handleIncrement = () => {
-    const newQuantity = displayQuantity + 1
-    setDisplayQuantity(newQuantity)
-    setInputValue(newQuantity.toString())
-    updateQuantity(newQuantity)
-  }
-
-  const handleDecrement = () => {
-    if (displayQuantity > 0) {
-      const newQuantity = displayQuantity - 1
-      setDisplayQuantity(newQuantity)
-      setInputValue(newQuantity.toString())
-      updateQuantity(newQuantity)
-    }
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    setInputValue(value)
-    
-    // Validate input
-    const numericValue = parseInt(value)
-    if (!isNaN(numericValue) && numericValue >= 0) {
-      setDisplayQuantity(numericValue)
-    }
-  }
-
-  const handleInputBlur = () => {
-    // Ensure input matches display quantity on blur
-    setInputValue(displayQuantity.toString())
-  }
+  }, [canSave, patchJson, pendingQuantity, quantity, wineId, onQuantityUpdated])
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-600">Quantity</span>
-        {showSuccess && (
-          <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
-            Updated!
-          </span>
-        )}
-        {error && (
-          <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
-            Error: {error}
-          </span>
-        )}
-      </div>
-      
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={handleDecrement}
-          disabled={loading || displayQuantity <= 0}
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0"
-        >
-          −
-        </Button>
-        
-        <Input
-          type="number"
-          value={inputValue}
-          onChange={handleInputChange}
-          onBlur={handleInputBlur}
-          disabled={loading}
-          min="0"
-          className="w-20 text-center"
-          placeholder="0"
-        />
-        
-        <Button
-          onClick={handleIncrement}
-          disabled={loading}
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0"
-        >
-          +
-        </Button>
-      </div>
-
-      {loading && (
-        <div className="text-xs text-gray-500 flex items-center gap-1">
-          <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
-          Updating...
-        </div>
-      )}
+    <div className="flex items-center gap-2">
+      <Button onClick={() => setPendingQuantity((q) => Math.max(0, q - 1))} disabled={isSaving}>-</Button>
+      <input
+        className="w-16 border rounded text-center"
+        type="number"
+        value={pendingQuantity}
+        onChange={(e) => setPendingQuantity(Math.max(0, Number(e.target.value)))}
+      />
+      <Button onClick={() => setPendingQuantity((q) => q + 1)} disabled={isSaving}>+</Button>
+      <Button onClick={submitChange} disabled={!canSave || isSaving} className="ml-2">{isSaving ? 'Saving...' : 'Save'}</Button>
     </div>
   )
-}
-
-// Debounce utility function
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => func(...args), wait)
-  }
 }

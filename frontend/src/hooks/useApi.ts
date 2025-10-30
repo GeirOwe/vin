@@ -6,13 +6,18 @@ export type ApiState<T> = {
   error: string | null
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+function buildUrl(url: string): string {
+  return url.startsWith('http') ? url : `${API_BASE}${url}`
+}
+
 export function useApi<T = any>() {
   const [state, setState] = useState<ApiState<T>>({ loading: false, data: null, error: null })
 
   const postJson = useCallback(async (url: string, body: unknown): Promise<T | null> => {
     setState({ loading: true, data: null, error: null })
     try {
-      const res = await fetch(url, {
+      const res = await fetch(buildUrl(url), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -33,7 +38,7 @@ export function useApi<T = any>() {
   const getJson = useCallback(async (url: string): Promise<T | null> => {
     setState({ loading: true, data: null, error: null })
     try {
-      const res = await fetch(url)
+      const res = await fetch(buildUrl(url))
       const data = await res.json().catch(() => null)
       if (!res.ok) {
         const message = (data && (data.detail || data.message)) || `Request failed (${res.status})`
@@ -50,7 +55,7 @@ export function useApi<T = any>() {
   const patchJson = useCallback(async (url: string, body: unknown): Promise<T | null> => {
     setState({ loading: true, data: null, error: null })
     try {
-      const res = await fetch(url, {
+      const res = await fetch(buildUrl(url), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

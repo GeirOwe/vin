@@ -11,20 +11,20 @@ export default function WineDetailView() {
   const handleQuantityUpdate = (newQuantity: number) => {
     // Refresh wine data after quantity update
     if (id) {
-      getJson(`http://localhost:8000/api/wines/${id}`)
+      getJson(`/api/wines/${id}`)
     }
   }
 
   const handleWineUpdate = () => {
     // Refresh wine data after any wine update
     if (id) {
-      getJson(`http://localhost:8000/api/wines/${id}`)
+      getJson(`/api/wines/${id}`)
     }
   }
 
   useEffect(() => {
     if (id) {
-      getJson(`http://localhost:8000/api/wines/${id}`)
+      getJson(`/api/wines/${id}`)
     }
   }, [id, getJson])
 

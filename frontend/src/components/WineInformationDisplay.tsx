@@ -33,7 +33,7 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
       if (drinkAfterDate) updateData.drink_after_date = drinkAfterDate
       if (drinkBeforeDate) updateData.drink_before_date = drinkBeforeDate
       
-      await patchJson(`http://localhost:8000/api/wines/${wine.id}`, updateData)
+      await patchJson(`/api/wines/${wine.id}`, updateData)
       setIsEditingDrinkingWindow(false)
       // Refresh the wine data in the parent component
       onWineUpdate?.()
@@ -54,87 +54,86 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
     if (!date) return '—'
     try {
       return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+        year: 'numeric', month: 'short', day: 'numeric'
       })
     } catch {
-      return date
+      return String(date)
     }
   }
 
-  const formatDrinkingWindow = (afterDate?: string | null, beforeDate?: string | null): string => {
-    const after = formatDate(afterDate)
-    const before = formatDate(beforeDate)
-    
-    if (after === '—' && before === '—') return '—'
-    if (after === '—') return `Before ${before}`
-    if (before === '—') return `After ${after}`
-    return `${after} to ${before}`
+  const formatDrinkingWindow = (after?: string | null, before?: string | null): string => {
+    if (!after && !before) return '—'
+    const afterStr = formatDate(after || undefined)
+    const beforeStr = formatDate(before || undefined)
+    return `${afterStr} → ${beforeStr}`
   }
 
   return (
     <div className="space-y-4">
-      {/* Core Wine Details */}
+      {/* Core Info */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl sm:text-2xl">{wine.name}</CardTitle>
+          <CardTitle className="text-lg">Core Information</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <span className="text-sm font-medium text-gray-600">Producer</span>
-              <p className="text-base">{wine.producer || '—'}</p>
+              <span className="text-sm font-medium text-gray-600">Name</span>
+              <p className="text-lg font-semibold">{wine.name}</p>
             </div>
             <div>
-              <span className="text-sm font-medium text-gray-600">Type</span>
-              <p className="text-base">{wine.type || '—'}</p>
+              <span className="text-sm font-medium text-gray-600">Producer</span>
+              <p className="text-lg">{wine.producer || '—'}</p>
             </div>
             <div>
               <span className="text-sm font-medium text-gray-600">Vintage</span>
-              <p className="text-base">{wine.vintage || '—'}</p>
+              <p className="text-lg">{wine.vintage ?? '—'}</p>
             </div>
             <div>
-              <span className="text-sm font-medium text-gray-600">Quantity</span>
-              <p className="text-base">{wine.quantity || '—'}</p>
+              <span className="text-sm font-medium text-gray-600">Type</span>
+              <p className="text-lg">{wine.type || '—'}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Geographic Origin */}
+      {/* Geographic */}
       {(wine.country || wine.district || wine.subdistrict) && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Origin</CardTitle>
+            <CardTitle className="text-lg">Geographic</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div>
-              <span className="text-sm font-medium text-gray-600">Country</span>
-              <p className="text-base">{wine.country || '—'}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-gray-600">District</span>
-              <p className="text-base">{wine.district || '—'}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-gray-600">Subdistrict</span>
-              <p className="text-base">{wine.subdistrict || '—'}</p>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <span className="text-sm font-medium text-gray-600">Country</span>
+                <p className="text-lg">{wine.country || '—'}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">District</span>
+                <p className="text-lg">{wine.district || '—'}</p>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Subdistrict</span>
+                <p className="text-lg">{wine.subdistrict || '—'}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Pricing */}
-      {wine.purchase_price && (
+      {(wine.purchase_price !== undefined || wine.quantity !== undefined) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Pricing</CardTitle>
           </CardHeader>
           <CardContent>
-            <div>
-              <span className="text-sm font-medium text-gray-600">Purchase Price</span>
-              <p className="text-lg font-semibold text-green-600">{formatPrice(wine.purchase_price)}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-sm font-medium text-gray-600">Purchase Price</span>
+                <p className="text-lg font-semibold text-green-600">{formatPrice(wine.purchase_price)}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -218,35 +217,20 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
             <CardTitle className="text-lg">Grape Composition</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {wine.grape_composition.map((grape) => (
-                <div key={grape.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                  <span className="font-medium">{grape.grape_variety}</span>
-                  <span className="text-sm bg-gray-100 px-2 py-1 rounded-full">
-                    {grape.percentage}%
-                  </span>
+            <div className="space-y-2">
+              {wine.grape_composition.map((gc) => (
+                <div key={gc.id} className="flex items-center justify-between">
+                  <span>{gc.grape_variety}</span>
+                  <span className="text-gray-600">{gc.percentage}%</span>
                 </div>
               ))}
-              <div className="pt-2 mt-2 border-t border-gray-200">
-                <div className="flex justify-between items-center font-medium">
-                  <span>Total</span>
-                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                    {wine.grape_composition.reduce((sum, grape) => sum + grape.percentage, 0)}%
-                  </span>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Inventory Tracking System */}
       {showInventoryTracking && (
-        <InventoryTrackingSystemView
-          wineId={wine.id}
-          currentQuantity={wine.quantity || 0}
-          onQuantityUpdate={onQuantityUpdate}
-        />
+        <InventoryTrackingSystemView wineId={wine.id} initialQuantity={wine.quantity ?? 0} onQuantityUpdate={onQuantityUpdate} />
       )}
     </div>
   )
