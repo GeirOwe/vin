@@ -290,7 +290,7 @@ Follow these exact steps to deploy both backend (FastAPI) and frontend (Vite) on
   - Repository: connect this GitHub repo (root = repo root)
   - Runtime: Python
   - Build command: `pip install -r requirements.txt`
-  - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+  - Start command: `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
   - Health check path: `/health`
   - Auto Deploy: On (recommended)
 
