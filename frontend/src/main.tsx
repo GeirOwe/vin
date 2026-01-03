@@ -7,6 +7,7 @@ import WineEntryForm from './components/WineEntryForm'
 import WineCollectionListView from './components/WineCollectionListView'
 import WineDetailView from './components/WineDetailView'
 import DrinkingWindowMonitoringView from './components/DrinkingWindowMonitoringView'
+import EmptyWinesView from './components/EmptyWinesView'
 
 const router = createBrowserRouter([
   {
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
       { path: 'add-wine', element: <WineEntryForm /> },
       { path: 'wines/:id', element: <WineDetailView /> },
       { path: 'drinking-window', element: <DrinkingWindowMonitoringView /> },
+      { path: 'empty', element: <EmptyWinesView /> },
     ],
   },
 ])

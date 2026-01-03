@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApi } from '../hooks/useApi'
-import { WineListItem } from '../types/wine'
+import { WineListItem, DrinkingWindowStatus } from '../types/wine'
 import WineEntryDisplayCard from './WineEntryDisplayCard'
 
 interface PaginatedResponse<T> {
@@ -15,7 +15,24 @@ type SortBy = 'id' | 'name' | 'producer' | 'vintage' | 'type'
 
 type SortOrder = 'asc' | 'desc'
 
-export default function WineCollectionListView({ endpoint = '/page', showSearchAndSort = true }: { endpoint?: string; showSearchAndSort?: boolean }) {
+interface FilterParams {
+  drinking_window_status?: DrinkingWindowStatus
+  quantity_filter?: 'non_zero' | 'zero' | 'all'
+}
+
+interface WineCollectionListViewProps {
+  endpoint?: string
+  showSearchAndSort?: boolean
+  title?: string
+  filterParams?: FilterParams
+  emptyStateMessage?: string
+}
+
+export default function WineCollectionListView({ 
+  endpoint = '/page', 
+  showSearchAndSort = true,
+  filterParams,
+}: WineCollectionListViewProps) {
   const { loading, error, data, getJson } = useApi<PaginatedResponse<WineListItem> | WineListItem[]>()
   const [page, setPage] = useState(1)
   const [pageSize] = useState(10)
@@ -30,6 +47,12 @@ export default function WineCollectionListView({ endpoint = '/page', showSearchA
     if (searchTerm) params.set('search_term', searchTerm)
     if (sortBy) params.set('sort_by', sortBy)
     if (sortOrder) params.set('sort_order', sortOrder)
+    if (filterParams?.drinking_window_status) {
+      params.set('drinking_window_status', filterParams.drinking_window_status)
+    }
+    if (filterParams?.quantity_filter) {
+      params.set('quantity_filter', filterParams.quantity_filter)
+    }
     params.set('page', String(pageToFetch))
     params.set('page_size', String(pageSize))
 
@@ -51,7 +74,7 @@ export default function WineCollectionListView({ endpoint = '/page', showSearchA
     setPage(1)
     fetchData(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, sortBy, sortOrder])
+  }, [searchTerm, sortBy, sortOrder, filterParams?.drinking_window_status])
 
   const wines: WineListItem[] = useMemo(() => {
     if (!data) return []

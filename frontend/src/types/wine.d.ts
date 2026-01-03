@@ -22,6 +22,16 @@ export interface Wine {
   grape_composition: Grape[]
 }
 
+export interface WineListItem {
+  id: number
+  name: string
+  producer?: string | null
+  vintage?: number | null
+  type?: string | null
+  quantity?: number | null
+  grape_composition: Grape[]
+}
+
 export type WineType = 'Red' | 'White' | 'Rose' | 'Sparkling' | 'Dessert' | 'Fortified'
 
 export type DrinkingWindowStatus = 'ready_to_drink' | 'approaching_deadline' | 'not_ready'

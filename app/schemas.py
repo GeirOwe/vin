@@ -1,3 +1,12 @@
+"""
+Pydantic schemas for API request/response validation.
+
+This module defines data validation schemas using Pydantic 2.9,
+providing type safety, validation, and serialization for API endpoints.
+All schemas include field-level validation rules and custom validators
+for complex business logic.
+"""
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -8,11 +17,43 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class GrapeCompositionSchema(BaseModel):
+    """
+    Schema for grape composition data.
+    
+    Attributes:
+        grape_variety: Name of the grape variety (1-100 characters)
+        percentage: Percentage of this variety (0-100, inclusive)
+    """
     grape_variety: str = Field(min_length=1, max_length=100)
     percentage: float = Field(ge=0, le=100)
 
 
 class WineCreateRequest(BaseModel):
+    """
+    Schema for creating a new wine entry.
+    
+    Validates wine data including grape composition percentages must sum to 100,
+    and drinking window dates must be in correct order.
+    
+    Attributes:
+        name: Wine name (required, 1-255 characters)
+        type: Wine type (optional enum)
+        producer: Producer name (optional, max 255 characters)
+        vintage: Vintage year (optional, 1800-2100)
+        country: Country of origin (optional, max 100 characters)
+        district: District/region (optional, max 100 characters)
+        subdistrict: Subdistrict/subregion (optional, max 100 characters)
+        purchase_price: Purchase price (optional, must be >= 0)
+        quantity: Initial quantity (optional, must be >= 0)
+        drink_after_date: Earliest drinking date (optional)
+        drink_before_date: Latest drinking date (optional, must be after drink_after_date)
+        grape_composition: List of grape compositions (optional, percentages must sum to ~100)
+    
+    Validation:
+        - Grape composition percentages must sum to approximately 100 (±0.5)
+        - Grape varieties must be unique within a composition
+        - drink_before_date must be after drink_after_date if both provided
+    """
     name: str = Field(min_length=1, max_length=255)
     type: Optional["WineType"] = Field(default=None)
     producer: Optional[str] = Field(default=None, max_length=255)

@@ -55,20 +55,33 @@ def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType
         
         if drinking_window_status == "ready_to_drink":
             # Wines where today is between drink_after_date and drink_before_date
+            # Both dates must be present (not NULL) for a wine to be considered ready
             stmt = stmt.filter(
+                Wine.drink_after_date.isnot(None),
+                Wine.drink_before_date.isnot(None),
                 Wine.drink_after_date <= today,
                 Wine.drink_before_date >= today
             )
         elif drinking_window_status == "approaching_deadline":
             # Wines where drink_before_date is within 30 days of today
+            # Must have drink_before_date set, and it must be in the future but within 30 days
             deadline_threshold = today + timedelta(days=30)
             stmt = stmt.filter(
+                Wine.drink_before_date.isnot(None),
                 Wine.drink_before_date <= deadline_threshold,
                 Wine.drink_before_date >= today
             )
         elif drinking_window_status == "not_ready":
             # Wines where today is before drink_after_date
-            stmt = stmt.filter(Wine.drink_after_date > today)
+            # Must have drink_after_date set, and it must be in the future
+            stmt = stmt.filter(
+                Wine.drink_after_date.isnot(None),
+                Wine.drink_after_date > today
+            )
+        
+        # Exclude wines with zero quantity from drinking window status filters
+        # Wines with zero quantity are no longer in the collection and shouldn't trigger alerts
+        stmt = stmt.filter(Wine.quantity > 0)
     
     return stmt
 
@@ -83,10 +96,19 @@ def list_wines(
     district: Optional[str] = Query(None),
     subdistrict: Optional[str] = Query(None),
     drinking_window_status: Optional[str] = Query(None),
+    quantity_filter: Optional[str] = Query("non_zero", pattern="^(non_zero|zero|all)$"),
 ) -> List[WineResponse]:
     try:
         stmt = select(Wine).options(selectinload(Wine.grape_compositions)).order_by(Wine.id.desc())
         stmt = apply_filters(stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
+        
+        # Apply quantity filter (default: exclude zero quantity wines)
+        if quantity_filter == "non_zero":
+            stmt = stmt.filter(Wine.quantity > 0)
+        elif quantity_filter == "zero":
+            stmt = stmt.filter((Wine.quantity == 0) | (Wine.quantity.is_(None)))
+        # If quantity_filter is "all", don't apply any quantity filter
+        
         wines = db.execute(stmt).scalars().all()
         return [
             WineResponse(
@@ -127,11 +149,18 @@ def list_wines_page(
     district: Optional[str] = Query(None),
     subdistrict: Optional[str] = Query(None),
     drinking_window_status: Optional[str] = Query(None),
+    quantity_filter: Optional[str] = Query("non_zero", pattern="^(non_zero|zero|all)$"),
 ) -> WineListPageResponse:
     try:
         # Base query with eager load to prevent N+1
         base_stmt = select(Wine).options(selectinload(Wine.grape_compositions))
         base_stmt = apply_filters(base_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
+        
+        # Apply quantity filter (default: exclude zero quantity wines)
+        if quantity_filter == "non_zero":
+            base_stmt = base_stmt.filter(Wine.quantity > 0)
+        elif quantity_filter == "zero":
+            base_stmt = base_stmt.filter((Wine.quantity == 0) | (Wine.quantity.is_(None)))
 
         # Sorting
         sort_field = {
@@ -146,9 +175,13 @@ def list_wines_page(
         else:
             base_stmt = base_stmt.order_by(sort_field.asc())
 
-        # Count total AFTER filters
+        # Count total AFTER filters (including quantity filter)
         count_stmt = select(func.count(Wine.id))
-        count_stmt = apply_filters(count_stmt, search_term, wine_type, vintage, country, district, subdistrict)
+        count_stmt = apply_filters(count_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
+        if quantity_filter == "non_zero":
+            count_stmt = count_stmt.filter(Wine.quantity > 0)
+        elif quantity_filter == "zero":
+            count_stmt = count_stmt.filter((Wine.quantity == 0) | (Wine.quantity.is_(None)))
         total_items = db.execute(count_stmt).scalar_one()
 
         # Pagination

@@ -1,3 +1,18 @@
+# Database configuration
+# SQLite (default, for local development):
+# DATABASE_URL=sqlite:///./vin.db
+
+# PostgreSQL (for production, Render PostgreSQL, Aurora PostgreSQL, etc.):
+# DATABASE_URL=postgresql://username:password@host:port/database
+# Example for Render PostgreSQL:
+# DATABASE_URL=postgresql://user:password@dpg-xxxxx-a.oregon-postgres.render.com/vin_db
+
+# PostgreSQL connection pool settings (optional, only used for PostgreSQL):
+# DB_POOL_SIZE=5              # Number of connections to maintain in pool (default: 5)
+# DB_MAX_OVERFLOW=10          # Additional connections beyond pool_size (default: 10)
+# DB_POOL_TIMEOUT=30          # Seconds to wait for connection (default: 30)
+# DB_POOL_RECYCLE=3600        # Recycle connections after N seconds (default: 3600)
+
 # External wine API configuration
 EXTERNAL_WINE_API_BASE_URL=https://api.example-wine.com
 EXTERNAL_WINE_API_KEY=your_api_key_here

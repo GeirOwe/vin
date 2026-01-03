@@ -1,35 +1,98 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
 
 from .api.endpoints.wines import router as wines_router
+from .core.config import Settings
+from .core.logging import setup_logging, get_logger
+from .database import check_database_connection
 
-app = FastAPI(title="VIN API")
+# Initialize settings
+settings = Settings.from_env()
 
-# CORS configured via env var (comma-separated). Defaults to localhost during development.
-origins = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
-).split(",")
+# Setup logging
+setup_logging(settings.logging)
+logger = get_logger(__name__)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[o.strip() for o in origins if o.strip()],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan context manager.
+    Handles startup and shutdown events.
+    """
+    # Startup
+    logger.info("Starting VIN API application...")
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Debug mode: {settings.debug}")
+    
+    # Verify database connection on startup
+    db_healthy, db_message = check_database_connection()
+    if db_healthy:
+        logger.info("Database connection verified successfully")
+    else:
+        logger.warning(f"Database connection check failed: {db_message}")
+    
+    logger.info("Application startup complete")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down VIN API application...")
+    # Add any cleanup logic here (close connections, cleanup resources, etc.)
+    logger.info("Application shutdown complete")
+
+
+# Create FastAPI application with lifespan
+app = FastAPI(
+    title="VIN API",
+    description="Wine Collection Management System API",
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
-# Simple root and health endpoints
+# Configure CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors.allowed_origins,
+    allow_credentials=settings.cors.allow_credentials,
+    allow_methods=settings.cors.allow_methods,
+    allow_headers=settings.cors.allow_headers,
+)
+
+# Root endpoint
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "VIN API", "routes": ["/api/wines"]}
+    """Root endpoint with service information."""
+    return {
+        "status": "ok",
+        "service": "VIN API",
+        "version": "1.0.0",
+        "routes": ["/api/wines"],
+    }
 
+# Health check endpoint
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    """
+    Health check endpoint that verifies both API and database connectivity.
+    Returns detailed status information for monitoring.
+    """
+    db_healthy, db_message = check_database_connection()
+    
+    status = "ok" if db_healthy else "degraded"
+    
+    return {
+        "status": status,
+        "api": "ok",
+        "database": {
+            "status": "ok" if db_healthy else "error",
+            "message": db_message
+        }
+    }
 
-# Routers
+# Include routers
 app.include_router(wines_router)

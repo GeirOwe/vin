@@ -93,8 +93,56 @@ lsof -ti tcp:8000 | xargs kill -9
 
 ## 🗄️ Database
 
-- **Default**: SQLite file `vin.db` in project root
-- **Override**: Set `DATABASE_URL` environment variable for PostgreSQL/other databases
+- **Default**: SQLite file `vin.db` in project root (for local development)
+- **Production**: PostgreSQL recommended (Render PostgreSQL, Aurora PostgreSQL, or any PostgreSQL database)
+
+### **Database Configuration**
+
+#### **SQLite (Local Development)**
+```bash
+# Default - no configuration needed
+# Database file: vin.db in project root
+```
+
+#### **PostgreSQL (Production)**
+Set the `DATABASE_URL` environment variable:
+```bash
+DATABASE_URL=postgresql://username:password@host:port/database
+```
+
+**Example for Render PostgreSQL:**
+```bash
+DATABASE_URL=postgresql://user:password@dpg-xxxxx-a.oregon-postgres.render.com/vin_db
+```
+
+#### **Connection Pooling (PostgreSQL Only)**
+The application automatically configures connection pooling for PostgreSQL databases to optimize performance and handle concurrent connections efficiently.
+
+Optional environment variables to customize pooling:
+- `DB_POOL_SIZE` (default: 5) - Number of connections to maintain in pool
+- `DB_MAX_OVERFLOW` (default: 10) - Additional connections beyond pool_size
+- `DB_POOL_TIMEOUT` (default: 30) - Seconds to wait for connection
+- `DB_POOL_RECYCLE` (default: 3600) - Recycle connections after N seconds
+
+**Note**: Connection pooling is automatically enabled for PostgreSQL and disabled for SQLite (not supported).
+
+### **Health Check**
+The `/health` endpoint includes database connectivity verification:
+```bash
+curl http://localhost:8000/health
+```
+
+Response includes database status:
+```json
+{
+  "status": "ok",
+  "api": "ok",
+  "database": {
+    "status": "ok",
+    "message": "Database connection successful"
+  }
+}
+```
 
 ### **Data Models**
 - **Wine**: Core wine information with relationships
@@ -110,9 +158,22 @@ cp ENVIRONMENT.example .env
 ```
 
 ### **Available Variables**
-- `DATABASE_URL` (optional): Custom database connection string
+
+#### **Database Configuration**
+- `DATABASE_URL` (optional): Database connection string
+  - SQLite (default): `sqlite:///./vin.db`
+  - PostgreSQL: `postgresql://user:password@host:port/database`
+- `DB_POOL_SIZE` (optional): Connection pool size for PostgreSQL (default: 5)
+- `DB_MAX_OVERFLOW` (optional): Max overflow connections for PostgreSQL (default: 10)
+- `DB_POOL_TIMEOUT` (optional): Connection timeout in seconds (default: 30)
+- `DB_POOL_RECYCLE` (optional): Connection recycle time in seconds (default: 3600)
+
+#### **External API Configuration**
 - `EXTERNAL_WINE_API_BASE_URL` (optional): External wine API base URL
 - `EXTERNAL_WINE_API_KEY` (optional): API key for external wine suggestions
+
+#### **CORS Configuration**
+- `CORS_ORIGINS` (optional): Comma-separated list of allowed origins (default: localhost:5173)
 
 ## 🌐 API Endpoints
 
@@ -120,7 +181,7 @@ Base URL: `http://localhost:8000` (or `8001` if using alternative port)
 
 ### **Core Endpoints**
 - `GET /` → Service banner
-- `GET /health` → Health check status
+- `GET /health` → Health check status (includes database connectivity check)
 
 ### **Wine Management**
 - `GET /api/wines` → List all wines with grape compositions

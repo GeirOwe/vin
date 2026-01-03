@@ -5,6 +5,7 @@ export default function App() {
   const isCollection = location.pathname === '/'
   const isDrinkingWindow = location.pathname === '/drinking-window'
   const isAddWine = location.pathname === '/add-wine'
+  const isEmpty = location.pathname === '/empty'
 
   return (
     <div className="min-h-full p-6 max-w-4xl mx-auto">
@@ -13,6 +14,7 @@ export default function App() {
         <div className="flex gap-2">
           <Link to="/" className={`px-3 py-1.5 rounded border ${isCollection ? 'bg-black text-white' : 'border-gray-300'}`}>Collection</Link>
           <Link to="/drinking-window" className={`px-3 py-1.5 rounded border ${isDrinkingWindow ? 'bg-black text-white' : 'border-gray-300'}`}>Drinking Window</Link>
+          <Link to="/empty" className={`px-3 py-1.5 rounded border ${isEmpty ? 'bg-black text-white' : 'border-gray-300'}`}>Empty</Link>
           <Link to="/add-wine" className={`px-3 py-1.5 rounded border ${isAddWine ? 'bg-black text-white' : 'border-gray-300'}`}>Add Wine</Link>
         </div>
       </div>

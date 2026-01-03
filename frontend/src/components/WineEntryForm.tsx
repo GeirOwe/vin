@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useApi } from '../hooks/useApi'
-import WineDetailsInput from './WineDetailsInput'
-import PricingQuantityInput from './PricingQuantityInput'
+import { WineDetailsInput } from './WineDetailsInput'
+import { PricingQuantityInput } from './PricingQuantityInput'
 import DrinkingWindowInput from './DrinkingWindowInput'
-import GrapeCompositionInput from './GrapeCompositionInput'
+import { GrapeCompositionInput } from './GrapeCompositionInput'
 
 export default function WineEntryForm() {
   const { postJson, loading, error, data } = useApi<any>()
