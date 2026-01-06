@@ -39,7 +39,6 @@ export default function WineCollectionListView({
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState<SortBy>('id')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
-  const [totalPages, setTotalPages] = useState<number | null>(null)
   const lastQueryRef = useRef<string>('')
 
   const fetchData = (pageToFetch: number) => {

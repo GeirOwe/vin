@@ -8,7 +8,7 @@ export default function WineDetailView() {
   const { id } = useParams<{ id: string }>()
   const { loading, error, data, getJson } = useApi<Wine>()
 
-  const handleQuantityUpdate = (newQuantity: number) => {
+  const handleQuantityUpdate = () => {
     // Refresh wine data after quantity update
     if (id) {
       getJson(`/api/wines/${id}`)
