@@ -321,9 +321,23 @@ Follow these exact steps to deploy both backend (FastAPI) and frontend (Vite) on
   - Backend base URL for the frontend:
     - `VITE_API_BASE=https://YOUR-BACKEND-URL.onrender.com`
 
+- **IMPORTANT: Fix 404 Errors for Client-Side Routes**
+  - The project includes a `404.html` file that will be copied to `dist` during build
+  - However, Render may not use it automatically
+  - **Option 1 (Recommended)**: Use `render.yaml` for configuration
+    - The project root includes a `render.yaml` file
+    - In Render, go to your Static Site → Settings → "Render Configuration File"
+    - Set it to use `render.yaml` from the root directory
+    - This will configure automatic redirects for all routes to `index.html`
+  - **Option 2**: Manual configuration
+    - In Render Static Site Settings, look for "Headers" or "Redirects" section
+    - Add a redirect rule: `/*` → `/index.html` (200 status)
+  - Without proper configuration, clicking on wines will show 404 errors
+
 - Deploy and verify
   - Open your frontend URL
   - If you see CORS errors, ensure the backend `CORS_ORIGINS` includes your exact frontend URL (scheme + domain)
+  - Test navigation: Click on a wine from the collection - it should navigate to `/wines/1` without 404
 
 ### Order of Operations
 1. Deploy Backend → copy its URL

@@ -157,10 +157,17 @@ def list_wines_page(
         base_stmt = apply_filters(base_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
         
         # Apply quantity filter (default: exclude zero quantity wines)
-        if quantity_filter == "non_zero":
-            base_stmt = base_stmt.filter(Wine.quantity > 0)
-        elif quantity_filter == "zero":
-            base_stmt = base_stmt.filter((Wine.quantity == 0) | (Wine.quantity.is_(None)))
+        # Note: If drinking_window_status is set, quantity > 0 is already applied in apply_filters
+        # So we only apply quantity_filter if drinking_window_status is not set, or if quantity_filter is explicitly "all"
+        if not drinking_window_status:
+            if quantity_filter == "non_zero":
+                base_stmt = base_stmt.filter(Wine.quantity > 0)
+            elif quantity_filter == "zero":
+                base_stmt = base_stmt.filter((Wine.quantity == 0) | (Wine.quantity.is_(None)))
+        elif quantity_filter == "all":
+            # If drinking_window_status is set but quantity_filter is "all", remove the quantity > 0 filter
+            # This allows viewing wines with zero quantity even in drinking window views (though unusual)
+            pass
 
         # Sorting
         sort_field = {
@@ -178,10 +185,15 @@ def list_wines_page(
         # Count total AFTER filters (including quantity filter)
         count_stmt = select(func.count(Wine.id))
         count_stmt = apply_filters(count_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
-        if quantity_filter == "non_zero":
-            count_stmt = count_stmt.filter(Wine.quantity > 0)
-        elif quantity_filter == "zero":
-            count_stmt = count_stmt.filter((Wine.quantity == 0) | (Wine.quantity.is_(None)))
+        # Apply quantity filter consistently with main query
+        if not drinking_window_status:
+            if quantity_filter == "non_zero":
+                count_stmt = count_stmt.filter(Wine.quantity > 0)
+            elif quantity_filter == "zero":
+                count_stmt = count_stmt.filter((Wine.quantity == 0) | (Wine.quantity.is_(None)))
+        elif quantity_filter == "all":
+            # If drinking_window_status is set but quantity_filter is "all", remove the quantity > 0 filter
+            pass
         total_items = db.execute(count_stmt).scalar_one()
 
         # Pagination
