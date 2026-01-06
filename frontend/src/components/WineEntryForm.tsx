@@ -36,7 +36,7 @@ export default function WineEntryForm() {
 
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Grape Composition</h2>
-        <GrapeCompositionInput onChange={(v) => setForm((f: any) => ({ ...f, ...v }))} />
+        <GrapeCompositionInput onChange={(v) => setForm((f: any) => ({ ...f, grape_composition: v }))} />
       </div>
 
       <div className="pt-4">

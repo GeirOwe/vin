@@ -328,13 +328,13 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
           </CardContent>
         </Card>
 
-      {/* Grape Composition */}
-      {wine.grape_composition && wine.grape_composition.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Grape Composition</CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* Grape Composition - Always show, even if empty */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Grape Composition</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {wine.grape_composition && wine.grape_composition.length > 0 ? (
             <div className="space-y-2">
               {wine.grape_composition.map((gc) => (
                 <div key={gc.id} className="flex items-center justify-between">
@@ -343,9 +343,11 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="text-gray-500 italic">No grape composition information available</div>
+          )}
+        </CardContent>
+      </Card>
 
       {showInventoryTracking && (
         <InventoryTrackingSystemView wineId={wine.id} initialQuantity={wine.quantity ?? 0} onQuantityUpdate={onQuantityUpdate} />
