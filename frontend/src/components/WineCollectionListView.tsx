@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { WineListItem, DrinkingWindowStatus } from '../types/wine'
 import WineEntryDisplayCard from './WineEntryDisplayCard'
@@ -33,6 +34,7 @@ export default function WineCollectionListView({
   showSearchAndSort = true,
   filterParams,
 }: WineCollectionListViewProps) {
+  const navigate = useNavigate()
   const { loading, error, data, getJson } = useApi<PaginatedResponse<WineListItem> | WineListItem[]>()
   const [page, setPage] = useState(1)
   const [pageSize] = useState(10)
@@ -82,7 +84,7 @@ export default function WineCollectionListView({
   }, [data])
 
   const handleWineClick = (wineId: number) => {
-    window.location.href = `/wines/${wineId}`
+    navigate(`/wines/${wineId}`)
   }
 
   return (

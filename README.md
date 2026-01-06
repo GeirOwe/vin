@@ -321,23 +321,19 @@ Follow these exact steps to deploy both backend (FastAPI) and frontend (Vite) on
   - Backend base URL for the frontend:
     - `VITE_API_BASE=https://YOUR-BACKEND-URL.onrender.com`
 
-- **IMPORTANT: Fix 404 Errors for Client-Side Routes**
+- **IMPORTANT: Client-Side Routing**
+  - The app uses React Router for client-side navigation
+  - Navigation within the app (clicking on wines, etc.) works automatically
+  - If you directly navigate to a route like `/wines/1` (refresh or direct link), you may see a 404
   - The project includes a `404.html` file that will be copied to `dist` during build
-  - However, Render may not use it automatically
-  - **Option 1 (Recommended)**: Use `render.yaml` for configuration
-    - The project root includes a `render.yaml` file
-    - In Render, go to your Static Site → Settings → "Render Configuration File"
-    - Set it to use `render.yaml` from the root directory
-    - This will configure automatic redirects for all routes to `index.html`
-  - **Option 2**: Manual configuration
-    - In Render Static Site Settings, look for "Headers" or "Redirects" section
-    - Add a redirect rule: `/*` → `/index.html` (200 status)
-  - Without proper configuration, clicking on wines will show 404 errors
+  - If Render serves `404.html` for missing routes, React Router will handle the routing correctly
+  - **Note**: The main navigation (clicking wines from collection) uses React Router and works without server configuration
 
 - Deploy and verify
   - Open your frontend URL
   - If you see CORS errors, ensure the backend `CORS_ORIGINS` includes your exact frontend URL (scheme + domain)
   - Test navigation: Click on a wine from the collection - it should navigate to `/wines/1` without 404
+  - If you refresh on `/wines/1`, you may see a 404 page, but clicking from the collection works fine
 
 ### Order of Operations
 1. Deploy Backend → copy its URL
