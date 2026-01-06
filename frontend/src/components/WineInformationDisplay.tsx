@@ -327,7 +327,6 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
             )}
           </CardContent>
         </Card>
-      )}
 
       {/* Grape Composition */}
       {wine.grape_composition && wine.grape_composition.length > 0 && (
