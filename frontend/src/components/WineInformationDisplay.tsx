@@ -37,7 +37,7 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
 
   const formatPrice = (price: number | null | undefined): string => {
     if (price === null || price === undefined) return '—'
-    return `$${price.toFixed(2)}`
+    return price.toFixed(2)
   }
 
   const handleSaveCore = async () => {

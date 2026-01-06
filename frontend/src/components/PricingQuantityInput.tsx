@@ -38,7 +38,7 @@ function parseCurrency(value: string) {
   return Number.isFinite(num) ? num : null
 }
 
-export function PricingQuantityInput({ value, onChange, disabled, currencySymbol = '$' }: PricingQuantityInputProps) {
+export function PricingQuantityInput({ value, onChange, disabled, currencySymbol = '' }: PricingQuantityInputProps) {
   const [priceInput, setPriceInput] = useState<string>(
     value?.purchase_price != null ? `${currencySymbol}${value.purchase_price.toFixed(2)}` : ''
   )
@@ -81,7 +81,7 @@ export function PricingQuantityInput({ value, onChange, disabled, currencySymbol
         <Label htmlFor="purchase_price">Purchase Price</Label>
         <Input
           id="purchase_price"
-          placeholder={`${currencySymbol}0.00`}
+          placeholder="0.00"
           value={priceInput}
           onChange={e => setPriceInput(formatCurrency(e.target.value, currencySymbol))}
           disabled={disabled}
