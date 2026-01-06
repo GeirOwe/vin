@@ -78,9 +78,6 @@ export default function DrinkingWindowMonitoringView() {
               >
                 <span className="text-2xl">{tab.emoji}</span>
                 <span className="font-medium">{tab.label}</span>
-                <span className="text-xs opacity-75 text-center">
-                  {tab.description}
-                </span>
               </Button>
             ))}
           </div>
