@@ -178,7 +178,7 @@ cp ENVIRONMENT.example .env
 - `EXTERNAL_WINE_API_BASE_URL` (optional): External wine API base URL
 - `EXTERNAL_WINE_API_KEY` (optional): API key for external wine suggestions
 - `XAI_API_KEY` (optional): xAI API key for “Scan label” / Grok label extraction on Add Wine
-- `XAI_MODEL` (optional): Vision model name (default: `grok-2-vision-1212`)
+- `XAI_MODEL` (optional): Vision-capable model name (default: `grok-4`)
 - `XAI_API_BASE` (optional): xAI API base URL (default: `https://api.x.ai/v1`)
 
 #### **CORS Configuration**

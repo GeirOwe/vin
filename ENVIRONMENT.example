@@ -25,4 +25,4 @@ EXTERNAL_WINE_API_KEY=your_api_key_here
 XAI_API_KEY=your_xai_api_key_here
 # Optional overrides:
 # XAI_API_BASE=https://api.x.ai/v1
-# XAI_MODEL=grok-2-vision-1212
+# XAI_MODEL=grok-4

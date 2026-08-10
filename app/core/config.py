@@ -77,7 +77,7 @@ class XaiConfig:
         return cls(
             api_key=os.getenv("XAI_API_KEY"),
             api_base=os.getenv("XAI_API_BASE", "https://api.x.ai/v1").rstrip("/"),
-            model=os.getenv("XAI_MODEL", "grok-2-vision-1212"),
+            model=os.getenv("XAI_MODEL", "grok-4"),
         )
 
 
