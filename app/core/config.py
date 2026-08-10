@@ -66,6 +66,22 @@ class ExternalWineApiConfig:
 
 
 @dataclass(frozen=True)
+class XaiConfig:
+    """xAI (Grok) API configuration for label image extraction."""
+    api_key: str | None
+    api_base: str
+    model: str
+
+    @classmethod
+    def from_env(cls) -> XaiConfig:
+        return cls(
+            api_key=os.getenv("XAI_API_KEY"),
+            api_base=os.getenv("XAI_API_BASE", "https://api.x.ai/v1").rstrip("/"),
+            model=os.getenv("XAI_MODEL", "grok-2-vision-1212"),
+        )
+
+
+@dataclass(frozen=True)
 class LoggingConfig:
     """Logging configuration settings."""
     level: str
@@ -91,6 +107,7 @@ class Settings:
     database: DatabaseConfig
     cors: CORSConfig
     external_wine_api: ExternalWineApiConfig
+    xai: XaiConfig
     logging: LoggingConfig
     environment: str
     debug: bool
@@ -103,6 +120,7 @@ class Settings:
             database=DatabaseConfig.from_env(),
             cors=CORSConfig.from_env(),
             external_wine_api=ExternalWineApiConfig.from_env(),
+            xai=XaiConfig.from_env(),
             logging=LoggingConfig.from_env(),
             environment=environment,
             debug=os.getenv("DEBUG", "false").lower() == "true",

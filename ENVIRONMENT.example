@@ -2,12 +2,15 @@
 # SQLite (default, for local development):
 # DATABASE_URL=sqlite:///./vin.db
 
-# PostgreSQL (for production, Render PostgreSQL, Aurora PostgreSQL, etc.):
-# DATABASE_URL=postgresql://username:password@host:port/database
-# Example for Render PostgreSQL:
-# DATABASE_URL=postgresql://user:password@dpg-xxxxx-a.oregon-postgres.render.com/vin_db
+# PostgreSQL (production) — Neon recommended:
+# DATABASE_URL=postgresql://username:password@host/database?sslmode=require
+#
+# Neon (prefer the pooled connection string ending in -pooler....neon.tech):
+# DATABASE_URL=postgresql://user:password@ep-xxxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+#
+# On Render: set this as an Environment Variable on vin-backend (not on frontend).
 
-# PostgreSQL connection pool settings (optional, only used for PostgreSQL):
+# PostgreSQL connection pool settings (optional; ignored when using Neon pooler URL):
 # DB_POOL_SIZE=5              # Number of connections to maintain in pool (default: 5)
 # DB_MAX_OVERFLOW=10          # Additional connections beyond pool_size (default: 10)
 # DB_POOL_TIMEOUT=30          # Seconds to wait for connection (default: 30)
@@ -16,3 +19,10 @@
 # External wine API configuration
 EXTERNAL_WINE_API_BASE_URL=https://api.example-wine.com
 EXTERNAL_WINE_API_KEY=your_api_key_here
+
+# xAI / Grok — wine label photo extraction (Add Wine → Scan label)
+# Get a key at https://console.x.ai/
+XAI_API_KEY=your_xai_api_key_here
+# Optional overrides:
+# XAI_API_BASE=https://api.x.ai/v1
+# XAI_MODEL=grok-2-vision-1212

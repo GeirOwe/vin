@@ -2,36 +2,62 @@ from __future__ import annotations
 
 import os
 from typing import Generator
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Session
+from sqlalchemy.pool import NullPool
 
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./vin.db")
+def _normalize_database_url(url: str) -> str:
+    """Normalize provider URLs for SQLAlchemy + Neon/Postgres.
+
+    - Heroku/Neon/Render sometimes use postgres://; SQLAlchemy expects postgresql://
+    - Neon requires SSL; ensure sslmode=require when connecting to neon.tech
+    """
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+
+    if "neon.tech" not in url:
+        return url
+
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    if "sslmode" not in query:
+        query["sslmode"] = ["require"]
+    return urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+
+
+DATABASE_URL = _normalize_database_url(os.getenv("DATABASE_URL", "sqlite:///./vin.db"))
 
 # For SQLite, check_same_thread must be False when using threads (e.g., with FastAPI/Uvicorn)
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
-# Connection pooling configuration for PostgreSQL (Aurora, Render PostgreSQL, etc.)
-# SQLite doesn't support connection pooling, so these are only applied to PostgreSQL
+# Connection pooling for PostgreSQL. Neon pooler (PgBouncer) needs NullPool.
 is_postgresql = DATABASE_URL.startswith("postgresql")
-pool_kwargs = {}
+uses_neon_pooler = is_postgresql and "-pooler." in DATABASE_URL
+pool_kwargs: dict = {}
 if is_postgresql:
-    # Connection pool settings optimized for production PostgreSQL databases
-    pool_kwargs = {
-        "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),  # Number of connections to maintain
-        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "10")),  # Additional connections beyond pool_size
-        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),  # Seconds to wait for connection
-        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "3600")),  # Recycle connections after 1 hour
-        "pool_pre_ping": True,  # Verify connections before using (helps with connection health)
-    }
+    if uses_neon_pooler:
+        # Neon pooled endpoint: let Neon/PgBouncer manage connections
+        pool_kwargs = {
+            "poolclass": NullPool,
+        }
+    else:
+        pool_kwargs = {
+            "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
+            "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "10")),
+            "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
+            "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "3600")),
+            "pool_pre_ping": True,
+        }
 
 engine = create_engine(
     DATABASE_URL,
     echo=False,
     future=True,
     connect_args=connect_args,
-    **pool_kwargs
+    **pool_kwargs,
 )
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, class_=Session, future=True)

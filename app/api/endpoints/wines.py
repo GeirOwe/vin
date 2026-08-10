@@ -3,7 +3,7 @@ from __future__ import annotations
 from http import HTTPStatus
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session, selectinload
 
@@ -23,8 +23,11 @@ from ...schemas import (
     TastingNoteCreateRequest,
     TastingNoteResponse,
     WineConsumptionResponse,
+    LabelExtractionResponse,
 )
 from ...services.wine_api_service import fetch_drinking_window_suggestion, ExternalApiError, SupportedWineType
+from ...services.label_extraction_service import extract_wine_from_label_image, LabelExtractionError
+from ...core.config import XaiConfig
 
 
 # Ensure tables exist (simple auto-create). In production, use Alembic migrations instead.
@@ -535,6 +538,32 @@ async def drinking_window_suggestions(
         return await fetch_drinking_window_suggestion(wine_type=wine_type, vintage=vintage)
     except ExternalApiError as e:
         raise HTTPException(status_code=HTTPStatus.BAD_GATEWAY, detail=str(e))
+
+
+@router.post("/extract-from-label", response_model=LabelExtractionResponse)
+async def extract_from_label(
+    image: UploadFile = File(..., description="Wine label photo (JPEG, PNG, or WebP)"),
+) -> LabelExtractionResponse:
+    """
+    Analyze a wine label image with Grok (xAI) and return suggested form fields.
+    Does not create a wine; client should review and submit via POST /api/wines.
+    """
+    content_type = image.content_type or "application/octet-stream"
+    image_bytes = await image.read()
+    try:
+        return await extract_wine_from_label_image(
+            image_bytes=image_bytes,
+            content_type=content_type,
+            config=XaiConfig.from_env(),
+        )
+    except LabelExtractionError as e:
+        message = str(e)
+        status = HTTPStatus.BAD_REQUEST
+        if "not configured" in message or "authentication" in message.lower():
+            status = HTTPStatus.SERVICE_UNAVAILABLE
+        elif "xAI error" in message or "rate limit" in message.lower() or "timed out" in message.lower():
+            status = HTTPStatus.BAD_GATEWAY
+        raise HTTPException(status_code=status, detail=message)
 
 
 @router.post("", response_model=WineResponse, status_code=HTTPStatus.CREATED)

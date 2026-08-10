@@ -94,7 +94,7 @@ lsof -ti tcp:8000 | xargs kill -9
 ## 🗄️ Database
 
 - **Default**: SQLite file `vin.db` in project root (for local development)
-- **Production**: PostgreSQL recommended (Render PostgreSQL, Aurora PostgreSQL, or any PostgreSQL database)
+- **Production**: PostgreSQL via [Neon](https://neon.tech) (recommended). Any PostgreSQL URL also works.
 
 ### **Database Configuration**
 
@@ -104,27 +104,33 @@ lsof -ti tcp:8000 | xargs kill -9
 # Database file: vin.db in project root
 ```
 
-#### **PostgreSQL (Production)**
-Set the `DATABASE_URL` environment variable:
+#### **PostgreSQL / Neon (Production)**
+Set the `DATABASE_URL` environment variable on **vin-backend** (Render):
+
 ```bash
-DATABASE_URL=postgresql://username:password@host:port/database
+DATABASE_URL=postgresql://username:password@host/database?sslmode=require
 ```
 
-**Example for Render PostgreSQL:**
+**Example for Neon** (use the **pooled** connection string from Neon Console → Connection details):
+
 ```bash
-DATABASE_URL=postgresql://user:password@dpg-xxxxx-a.oregon-postgres.render.com/vin_db
+DATABASE_URL=postgresql://user:password@ep-xxxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require
 ```
+
+Tips:
+- Prefer the Neon URL that contains `-pooler.` (connection pooling).
+- If Neon gives `postgres://...`, the app rewrites it to `postgresql://...` automatically.
+- SSL is required for Neon; the app adds `sslmode=require` if missing.
 
 #### **Connection Pooling (PostgreSQL Only)**
-The application automatically configures connection pooling for PostgreSQL databases to optimize performance and handle concurrent connections efficiently.
+- **Neon pooler URL** (`-pooler.`): app uses `NullPool` (Neon/PgBouncer manages pooling).
+- **Direct Postgres URL**: SQLAlchemy connection pool is used.
 
-Optional environment variables to customize pooling:
+Optional environment variables (only for non-pooler Postgres):
 - `DB_POOL_SIZE` (default: 5) - Number of connections to maintain in pool
 - `DB_MAX_OVERFLOW` (default: 10) - Additional connections beyond pool_size
 - `DB_POOL_TIMEOUT` (default: 30) - Seconds to wait for connection
 - `DB_POOL_RECYCLE` (default: 3600) - Recycle connections after N seconds
-
-**Note**: Connection pooling is automatically enabled for PostgreSQL and disabled for SQLite (not supported).
 
 ### **Health Check**
 The `/health` endpoint includes database connectivity verification:
@@ -162,8 +168,8 @@ cp ENVIRONMENT.example .env
 #### **Database Configuration**
 - `DATABASE_URL` (optional): Database connection string
   - SQLite (default): `sqlite:///./vin.db`
-  - PostgreSQL: `postgresql://user:password@host:port/database`
-- `DB_POOL_SIZE` (optional): Connection pool size for PostgreSQL (default: 5)
+  - Neon / PostgreSQL: `postgresql://user:password@host/database?sslmode=require`
+- `DB_POOL_SIZE` (optional): Connection pool size for PostgreSQL (default: 5; ignored for Neon pooler)
 - `DB_MAX_OVERFLOW` (optional): Max overflow connections for PostgreSQL (default: 10)
 - `DB_POOL_TIMEOUT` (optional): Connection timeout in seconds (default: 30)
 - `DB_POOL_RECYCLE` (optional): Connection recycle time in seconds (default: 3600)
@@ -171,6 +177,9 @@ cp ENVIRONMENT.example .env
 #### **External API Configuration**
 - `EXTERNAL_WINE_API_BASE_URL` (optional): External wine API base URL
 - `EXTERNAL_WINE_API_KEY` (optional): API key for external wine suggestions
+- `XAI_API_KEY` (optional): xAI API key for “Scan label” / Grok label extraction on Add Wine
+- `XAI_MODEL` (optional): Vision model name (default: `grok-2-vision-1212`)
+- `XAI_API_BASE` (optional): xAI API base URL (default: `https://api.x.ai/v1`)
 
 #### **CORS Configuration**
 - `CORS_ORIGINS` (optional): Comma-separated list of allowed origins (default: localhost:5173)
@@ -187,6 +196,7 @@ Base URL: `http://localhost:8000` (or `8001` if using alternative port)
 - `GET /api/wines` → List all wines with grape compositions
 - `GET /api/wines/page` → Paginated wines with search, sort, and filter options
 - `POST /api/wines` → Create new wine entry
+- `POST /api/wines/extract-from-label` → Upload label image; Grok suggests form fields (multipart `image`)
 - `GET /api/wines/{id}` → Get specific wine details
 - `PATCH /api/wines/{id}/quantity` → Update wine quantity
 - `POST /api/wines/{id}/consume` → Record wine consumption
@@ -295,14 +305,15 @@ Follow these exact steps to deploy both backend (FastAPI) and frontend (Vite) on
   - Auto Deploy: On (recommended)
 
 - Environment variables
-  - Choose ONE database option:
-    - SQLite + Persistent Disk (simple)
-      - Add Disk: size ≥ 1 GB, Mount Path: `/data`
-      - `DATABASE_URL=sqlite:////data/vin.db`
-      - Note: do not scale to multiple instances with SQLite.
-    - PostgreSQL (recommended for production)
-      - Create Render PostgreSQL
-      - `DATABASE_URL=<Render-provided-URL>`
+  - Database (recommended: Neon PostgreSQL):
+    - In Neon Console → your project → **Connection details**, copy the connection string
+      (prefer **Pooled connection** / host with `-pooler.`)
+    - On Render **vin-backend** → Environment, set:
+      - `DATABASE_URL=<your Neon connection string>`
+    - You do **not** need a Render Postgres service
+  - Alternative (simple, single instance only): SQLite + Persistent Disk
+    - Add Disk: size ≥ 1 GB, Mount Path: `/data`
+    - `DATABASE_URL=sqlite:////data/vin.db`
   - CORS (allow your frontend):
     - `CORS_ORIGINS=https://YOUR-FRONTEND-URL.onrender.com`
 

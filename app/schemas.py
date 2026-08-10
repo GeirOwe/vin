@@ -135,6 +135,24 @@ class DrinkingWindowSuggestionResponse(BaseModel):
     drink_before_date: date
 
 
+class LabelGrapeComposition(BaseModel):
+    grape_variety: str = Field(min_length=1, max_length=100)
+    percentage: Optional[float] = Field(default=None, ge=0, le=100)
+
+
+class LabelExtractionResponse(BaseModel):
+    """Suggested wine fields extracted from a label photo via Grok/xAI."""
+    name: Optional[str] = None
+    type: Optional["WineType"] = None
+    producer: Optional[str] = None
+    vintage: Optional[int] = Field(default=None, ge=1800, le=2100)
+    country: Optional[str] = None
+    district: Optional[str] = None
+    subdistrict: Optional[str] = None
+    grape_composition: Optional[List[LabelGrapeComposition]] = None
+    notes: Optional[str] = None
+
+
 # Filtering & pagination
 class WineType(str, Enum):
     Red = "Red"
