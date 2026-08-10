@@ -67,6 +67,15 @@ class WineCreateRequest(BaseModel):
     drink_before_date: Optional[date] = None
 
     grape_composition: Optional[List[GrapeCompositionSchema]] = None
+    label_image_base64: Optional[str] = Field(
+        default=None,
+        description="Optional label photo as base64 (raw or data-URL)",
+    )
+    label_image_content_type: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="MIME type for label image, e.g. image/jpeg",
+    )
 
     @model_validator(mode="after")
     def validate_dates_and_grapes(self) -> "WineCreateRequest":
@@ -96,12 +105,22 @@ class WineUpdateRequest(BaseModel):
     quantity: Optional[int] = Field(default=None, ge=0)
     drink_after_date: Optional[date] = None
     drink_before_date: Optional[date] = None
+    grape_composition: Optional[List[GrapeCompositionSchema]] = None
+    label_image_base64: Optional[str] = None
+    label_image_content_type: Optional[str] = Field(default=None, max_length=100)
 
     @model_validator(mode="after")
-    def validate_dates(self) -> "WineUpdateRequest":
+    def validate_dates_and_grapes(self) -> "WineUpdateRequest":
         if self.drink_after_date and self.drink_before_date:
             if self.drink_after_date >= self.drink_before_date:
                 raise ValueError("drink_before_date must be later than drink_after_date")
+        if self.grape_composition is not None and len(self.grape_composition) > 0:
+            total = sum(gc.percentage for gc in self.grape_composition)
+            if abs(total - 100.0) > 0.5:
+                raise ValueError("Sum of grape composition percentages must be approximately 100 (±0.5)")
+            varieties = [gc.grape_variety.strip().lower() for gc in self.grape_composition]
+            if len(set(varieties)) != len(varieties):
+                raise ValueError("Duplicate grape varieties are not allowed in grape_composition")
         return self
 
 
@@ -125,6 +144,7 @@ class WineResponse(BaseModel):
     drink_after_date: Optional[date]
     drink_before_date: Optional[date]
     grape_composition: List[GrapeCompositionResponse] = []
+    has_label_image: bool = False
 
     class Config:
         from_attributes = True
@@ -191,6 +211,7 @@ class WineListItem(BaseModel):
     type: Optional["WineType"]
     quantity: Optional[int] = None
     grape_composition: List[GrapeCompositionResponse] = []
+    has_label_image: bool = False
 
     class Config:
         from_attributes = True

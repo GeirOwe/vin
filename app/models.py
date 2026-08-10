@@ -16,6 +16,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     CheckConstraint,
@@ -88,6 +89,8 @@ class Wine(Base):
     quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     drink_after_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     drink_before_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    label_image: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    label_image_content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     owner: Mapped[User] = relationship(back_populates="wines")
 

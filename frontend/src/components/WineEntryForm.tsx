@@ -27,7 +27,6 @@ function normalizeGrapes(
     }))
   }
 
-  // Equal split when AI listed varieties without reliable %
   const share = Math.round((1000 / named.length)) / 10
   return named.map((g, idx) => ({
     grape_variety: g.grape_variety!,
@@ -35,11 +34,20 @@ function normalizeGrapes(
   }))
 }
 
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  return btoa(binary)
+}
+
 export default function WineEntryForm() {
   const { postJson, loading, error, data } = useApi<any>()
   const [form, setForm] = useState<any>({})
   const [formKey, setFormKey] = useState(0)
   const [prefill, setPrefill] = useState<any>({})
+  const [labelImage, setLabelImage] = useState<Blob | null>(null)
 
   const applyLabelExtraction = (extracted: LabelExtractionResult) => {
     const grape_composition = normalizeGrapes(extracted.grape_composition)
@@ -59,16 +67,21 @@ export default function WineEntryForm() {
   }
 
   const submit = async () => {
-    const payload = { ...form }
-    const created = await postJson('/api/wines', payload)
-    if (created) {
-      // Handle success state if needed
+    const payload: any = { ...form }
+    if (labelImage) {
+      payload.label_image_base64 = await blobToBase64(labelImage)
+      payload.label_image_content_type = labelImage.type || 'image/jpeg'
     }
+    await postJson('/api/wines', payload)
   }
 
   return (
     <div className="space-y-6">
-      <LabelScanInput onExtracted={applyLabelExtraction} disabled={loading} />
+      <LabelScanInput
+        onExtracted={applyLabelExtraction}
+        onImageChange={setLabelImage}
+        disabled={loading}
+      />
 
       <div className="section space-y-4">
         <div className="section__head">
@@ -118,6 +131,11 @@ export default function WineEntryForm() {
         <button onClick={submit} disabled={loading} className="btn btn--primary">
           {loading ? 'Lagrer…' : 'Opprett vin'}
         </button>
+        {labelImage && (
+          <p className="mt-2 text-sm" style={{ color: 'var(--ink-soft)' }}>
+            Etikettbilde er klart og lagres sammen med vinen.
+          </p>
+        )}
         {error && <div className="mt-2 text-sm" style={{ color: 'var(--danger)' }}>{error}</div>}
         {data && <div className="mt-2 text-sm" style={{ color: 'var(--brand-accent)' }}>Opprettet!</div>}
       </div>

@@ -20,6 +20,7 @@ export interface Wine {
   drink_after_date?: string | null
   drink_before_date?: string | null
   grape_composition: Grape[]
+  has_label_image?: boolean
 }
 
 export interface WineListItem {
@@ -30,6 +31,7 @@ export interface WineListItem {
   type?: string | null
   quantity?: number | null
   grape_composition: Grape[]
+  has_label_image?: boolean
 }
 
 export type WineType = 'Red' | 'White' | 'Rose' | 'Sparkling' | 'Dessert' | 'Fortified'

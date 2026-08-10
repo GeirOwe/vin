@@ -15,6 +15,7 @@ type LabelExtractionResult = {
 
 type Props = {
   onExtracted: (data: LabelExtractionResult) => void
+  onImageChange?: (image: Blob | null) => void
   disabled?: boolean
 }
 
@@ -38,7 +39,7 @@ async function compressImage(file: File, maxEdge = 1600, quality = 0.85): Promis
   return blob
 }
 
-export function LabelScanInput({ onExtracted, disabled }: Props) {
+export function LabelScanInput({ onExtracted, onImageChange, disabled }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -47,21 +48,30 @@ export function LabelScanInput({ onExtracted, disabled }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [notes, setNotes] = useState<string | null>(null)
 
-  const onFileChosen = (file: File | null) => {
+  const onFileChosen = async (file: File | null) => {
     setError(null)
     setNotes(null)
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     if (!file) {
       setSelectedFile(null)
       setPreviewUrl(null)
+      onImageChange?.(null)
       return
     }
     if (!file.type.startsWith('image/')) {
       setError('Velg en bildefil')
+      onImageChange?.(null)
       return
     }
     setSelectedFile(file)
     setPreviewUrl(URL.createObjectURL(file))
+    try {
+      const compressed = await compressImage(file)
+      onImageChange?.(compressed)
+    } catch (err: any) {
+      setError(err?.message || 'Kunne ikke lese bildet')
+      onImageChange?.(null)
+    }
   }
 
   const analyze = async () => {
@@ -71,6 +81,7 @@ export function LabelScanInput({ onExtracted, disabled }: Props) {
     setNotes(null)
     try {
       const compressed = await compressImage(selectedFile)
+      onImageChange?.(compressed)
       const formData = new FormData()
       formData.append('image', compressed, 'label.jpg')
 
@@ -97,7 +108,7 @@ export function LabelScanInput({ onExtracted, disabled }: Props) {
       <div>
         <h2 className="page-title" style={{ fontSize: '1.5rem' }}>Skann etikett</h2>
         <p className="text-sm mt-1" style={{ color: 'var(--ink-soft)' }}>
-          Ta bilde eller last opp etikettsbilde. Grok foreslår verdier i skjemaet — sjekk før du lagrer.
+          Ta bilde eller last opp etikettsbilde. Bildet lagres med vinen, og Grok kan fylle ut skjemaet.
         </p>
       </div>
 

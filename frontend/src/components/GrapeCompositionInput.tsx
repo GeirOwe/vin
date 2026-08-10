@@ -83,7 +83,7 @@ export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompos
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-medium">Grape Composition</h3>
+        <h3 className="text-base font-medium">Druer</h3>
         <button
           type="button"
           onClick={addRow}
@@ -98,10 +98,10 @@ export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompos
         {rows.map((row, idx) => (
           <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             <div className="md:col-span-7 grid gap-1">
-              <Label htmlFor={`grape_${idx}`}>Variety</Label>
+              <Label htmlFor={`grape_${idx}`}>Druesort</Label>
               <Input
                 id={`grape_${idx}`}
-                placeholder="e.g., Cabernet Sauvignon"
+                placeholder="f.eks. Cabernet Sauvignon"
                 value={row.grape_variety}
                 onChange={e => updateRow(idx, { grape_variety: e.target.value })}
                 disabled={disabled}
@@ -111,7 +111,7 @@ export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompos
               <Label htmlFor={`pct_${idx}`}>Prosent</Label>
               <Input
                 id={`pct_${idx}`}
-                placeholder="e.g., 60.5"
+                placeholder="f.eks. 60.5"
                 value={row.percentage}
                 onChange={e => updateRow(idx, { percentage: sanitizeProsentInput(e.target.value) })}
                 inputMode="decimal"

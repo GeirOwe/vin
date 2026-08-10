@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import base64
 from http import HTTPStatus
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session, selectinload
 
@@ -48,6 +50,53 @@ def get_owned_wine(
     if wine is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Vin ikke funnet")
     return wine
+
+
+def wine_has_label(wine: Wine) -> bool:
+    return bool(wine.label_image)
+
+
+def decode_label_image(payload) -> tuple[bytes | None, str | None]:
+    raw = getattr(payload, "label_image_base64", None)
+    if not raw:
+        return None, None
+    content_type = getattr(payload, "label_image_content_type", None) or "image/jpeg"
+    data = raw.strip()
+    if data.startswith("data:") and "," in data:
+        header, data = data.split(",", 1)
+        if ";base64" in header and header.startswith("data:"):
+            content_type = header[5:].split(";")[0] or content_type
+    try:
+        image_bytes = base64.b64decode(data, validate=False)
+    except Exception as exc:
+        raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Ugyldig etikettbilde (base64).") from exc
+    if not image_bytes:
+        return None, None
+    if len(image_bytes) > 12 * 1024 * 1024:
+        raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Etikettbildet er for stort (maks 12 MB).")
+    return image_bytes, content_type
+
+
+def to_wine_response(wine: Wine) -> WineResponse:
+    return WineResponse(
+        id=wine.id,
+        name=wine.name,
+        type=wine.type,
+        producer=wine.producer,
+        vintage=wine.vintage,
+        country=wine.country,
+        district=wine.district,
+        subdistrict=wine.subdistrict,
+        purchase_price=wine.purchase_price,
+        quantity=wine.quantity,
+        drink_after_date=wine.drink_after_date,
+        drink_before_date=wine.drink_before_date,
+        grape_composition=[
+            GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
+            for gc in (wine.grape_compositions or [])
+        ],
+        has_label_image=wine_has_label(wine),
+    )
 
 
 def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType], vintage: Optional[int], country: Optional[str], district: Optional[str], subdistrict: Optional[str], drinking_window_status: Optional[str] = None):
@@ -133,27 +182,7 @@ def list_wines(
         # If quantity_filter is "all", don't apply any quantity filter
         
         wines = db.execute(stmt).scalars().all()
-        return [
-            WineResponse(
-                id=w.id,
-                name=w.name,
-                type=w.type,
-                producer=w.producer,
-                vintage=w.vintage,
-                country=w.country,
-                district=w.district,
-                subdistrict=w.subdistrict,
-                purchase_price=w.purchase_price,
-                quantity=w.quantity,
-                drink_after_date=w.drink_after_date,
-                drink_before_date=w.drink_before_date,
-                grape_composition=[
-                    GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
-                    for gc in (w.grape_compositions or [])
-                ],
-            )
-            for w in wines
-        ]
+        return [to_wine_response(w) for w in wines]
     except Exception as exc:
         raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc))
 
@@ -241,6 +270,7 @@ def list_wines_page(
                     GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
                     for gc in (w.grape_compositions or [])
                 ],
+                has_label_image=wine_has_label(w),
             )
             for w in wines
         ]
@@ -259,24 +289,7 @@ def get_wine(
 ) -> WineResponse:
     try:
         wine = get_owned_wine(db, wine_id, current_user.id, load_grapes=True)
-        return WineResponse(
-            id=wine.id,
-            name=wine.name,
-            type=wine.type,
-            producer=wine.producer,
-            vintage=wine.vintage,
-            country=wine.country,
-            district=wine.district,
-            subdistrict=wine.subdistrict,
-            purchase_price=wine.purchase_price,
-            quantity=wine.quantity,
-            drink_after_date=wine.drink_after_date,
-            drink_before_date=wine.drink_before_date,
-            grape_composition=[
-                GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
-                for gc in (wine.grape_compositions or [])
-            ],
-        )
+        return to_wine_response(wine)
     except HTTPException:
         raise
     except Exception as exc:
@@ -291,38 +304,39 @@ def update_wine(
     current_user: User = Depends(get_current_user),
 ) -> WineResponse:
     try:
-        wine = get_owned_wine(db, wine_id, current_user.id)
-        
-        # Update fields if provided
+        wine = get_owned_wine(db, wine_id, current_user.id, load_grapes=True)
+
         update_data = payload.model_dump(exclude_unset=True)
+        grape_payload = update_data.pop("grape_composition", None)
+        update_data.pop("label_image_base64", None)
+        update_data.pop("label_image_content_type", None)
+
         for field, value in update_data.items():
             setattr(wine, field, value)
-        
-        # Commit changes
+
+        if "label_image_base64" in payload.model_fields_set and payload.label_image_base64:
+            image_bytes, content_type = decode_label_image(payload)
+            wine.label_image = image_bytes
+            wine.label_image_content_type = content_type
+
+        if grape_payload is not None:
+            wine.grape_compositions.clear()
+            for gc in grape_payload:
+                wine.grape_compositions.append(
+                    GrapeComposition(
+                        grape_variety=gc["grape_variety"],
+                        percentage=gc["percentage"],
+                    )
+                )
+
         db.commit()
-        db.refresh(wine)
-        
-        return WineResponse(
-            id=wine.id,
-            name=wine.name,
-            type=wine.type,
-            producer=wine.producer,
-            vintage=wine.vintage,
-            country=wine.country,
-            district=wine.district,
-            subdistrict=wine.subdistrict,
-            purchase_price=wine.purchase_price,
-            quantity=wine.quantity,
-            drink_after_date=wine.drink_after_date,
-            drink_before_date=wine.drink_before_date,
-            grape_composition=[
-                GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
-                for gc in (wine.grape_compositions or [])
-            ],
-        )
+        wine = get_owned_wine(db, wine_id, current_user.id, load_grapes=True)
+        return to_wine_response(wine)
     except HTTPException:
+        db.rollback()
         raise
     except Exception as exc:
+        db.rollback()
         raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc))
 
 
@@ -365,24 +379,7 @@ def update_wine_quantity(
         
         db.refresh(wine)
         
-        return WineResponse(
-            id=wine.id,
-            name=wine.name,
-            type=wine.type,
-            producer=wine.producer,
-            vintage=wine.vintage,
-            country=wine.country,
-            district=wine.district,
-            subdistrict=wine.subdistrict,
-            purchase_price=wine.purchase_price,
-            quantity=wine.quantity,
-            drink_after_date=wine.drink_after_date,
-            drink_before_date=wine.drink_before_date,
-            grape_composition=[
-                GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
-                for gc in (wine.grape_compositions or [])
-            ],
-        )
+        return to_wine_response(wine)
     except HTTPException:
         raise
     except Exception as exc:
@@ -485,24 +482,7 @@ def consume_wine(
             db.refresh(tasting_note)
         
         # Build response
-        wine_response = WineResponse(
-            id=wine.id,
-            name=wine.name,
-            type=wine.type,
-            producer=wine.producer,
-            vintage=wine.vintage,
-            country=wine.country,
-            district=wine.district,
-            subdistrict=wine.subdistrict,
-            purchase_price=wine.purchase_price,
-            quantity=wine.quantity,
-            drink_after_date=wine.drink_after_date,
-            drink_before_date=wine.drink_before_date,
-            grape_composition=[
-                GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
-                for gc in (wine.grape_compositions or [])
-            ],
-        )
+        wine_response = to_wine_response(wine)
         
         inventory_log_response = InventoryLogResponse(
             id=inventory_log.id,
@@ -576,6 +556,23 @@ async def extract_from_label(
         raise HTTPException(status_code=status, detail=message)
 
 
+
+@router.get("/{wine_id}/label-image")
+def get_wine_label_image(
+    wine_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    wine = get_owned_wine(db, wine_id, current_user.id)
+    if not wine.label_image:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Ingen etikettbilde for denne vinen")
+    return Response(
+        content=wine.label_image,
+        media_type=wine.label_image_content_type or "image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
 @router.post("", response_model=WineResponse, status_code=HTTPStatus.CREATED)
 def create_wine(
     payload: WineCreateRequest,
@@ -583,6 +580,7 @@ def create_wine(
     current_user: User = Depends(get_current_user),
 ) -> WineResponse:
     try:
+        label_bytes, label_type = decode_label_image(payload)
         wine = Wine(
             user_id=current_user.id,
             name=payload.name,
@@ -596,6 +594,8 @@ def create_wine(
             quantity=payload.quantity,
             drink_after_date=payload.drink_after_date,
             drink_before_date=payload.drink_before_date,
+            label_image=label_bytes,
+            label_image_content_type=label_type if label_bytes else None,
         )
         db.add(wine)
         db.flush()
@@ -613,25 +613,9 @@ def create_wine(
 
         db.commit()
         db.refresh(wine)
-
-        return WineResponse(
-            id=wine.id,
-            name=wine.name,
-            type=wine.type,
-            producer=wine.producer,
-            vintage=wine.vintage,
-            country=wine.country,
-            district=wine.district,
-            subdistrict=wine.subdistrict,
-            purchase_price=wine.purchase_price,
-            quantity=wine.quantity,
-            drink_after_date=wine.drink_after_date,
-            drink_before_date=wine.drink_before_date,
-            grape_composition=[
-                GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
-                for gc in (wine.grape_compositions or created_grapes)
-            ],
-        )
+        if created_grapes and not wine.grape_compositions:
+            wine.grape_compositions = created_grapes
+        return to_wine_response(wine)
     except HTTPException:
         db.rollback()
         raise

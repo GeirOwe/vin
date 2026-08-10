@@ -374,6 +374,22 @@ body,
       padding-left 0.25s var(--ease);
   }
 
+  .entity-row__thumb {
+    width: 48px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    flex-shrink: 0;
+    background: var(--paper-2);
+  }
+
+  .entity-row__thumb--empty {
+    background:
+      linear-gradient(135deg, rgba(31, 74, 60, 0.08), transparent 60%),
+      var(--paper-2);
+  }
+
   .entity-row:hover {
     background: var(--brand-accent-soft);
     padding-left: 0.45rem;

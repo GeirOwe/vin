@@ -1,11 +1,23 @@
 from __future__ import annotations
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from .database import Base, engine
 from .core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _add_column_if_missing(table: str, column: str, ddl_type: str) -> None:
+    insp = inspect(engine)
+    if table not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns(table)}
+    if column in cols:
+        return
+    logger.info(f"Adding missing column {table}.{column}")
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
 
 
 def ensure_schema() -> None:
@@ -36,4 +48,10 @@ def ensure_schema() -> None:
         Base.metadata.drop_all(bind=engine)
 
     Base.metadata.create_all(bind=engine)
+
+    # Non-destructive column adds for newer features
+    blob_type = "BYTEA" if engine.dialect.name == "postgresql" else "BLOB"
+    _add_column_if_missing("wines", "label_image", blob_type)
+    _add_column_if_missing("wines", "label_image_content_type", "VARCHAR(100)")
+
     logger.info("Database schema ready")
