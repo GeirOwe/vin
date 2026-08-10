@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { API_BASE, authHeaders, errorMessage } from '../hooks/useApi'
 
 type LabelExtractionResult = {
   name?: string | null
@@ -17,8 +18,6 @@ type Props = {
   disabled?: boolean
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
-
 async function compressImage(file: File, maxEdge = 1600, quality = 0.85): Promise<Blob> {
   const bitmap = await createImageBitmap(file)
   const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
@@ -28,14 +27,14 @@ async function compressImage(file: File, maxEdge = 1600, quality = 0.85): Promis
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Could not process image')
+  if (!ctx) throw new Error('Kunne ikke behandle bildet')
   ctx.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
 
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob((b) => resolve(b), 'image/jpeg', quality)
   )
-  if (!blob) throw new Error('Could not compress image')
+  if (!blob) throw new Error('Kunne ikke komprimere bildet')
   return blob
 }
 
@@ -58,7 +57,7 @@ export function LabelScanInput({ onExtracted, disabled }: Props) {
       return
     }
     if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file')
+      setError('Velg en bildefil')
       return
     }
     setSelectedFile(file)
@@ -77,14 +76,12 @@ export function LabelScanInput({ onExtracted, disabled }: Props) {
 
       const res = await fetch(`${API_BASE}/api/wines/extract-from-label`, {
         method: 'POST',
+        headers: authHeaders(),
         body: formData,
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
-        const message =
-          (data && (typeof data.detail === 'string' ? data.detail : data.message)) ||
-          `Request failed (${res.status})`
-        throw new Error(message)
+        throw new Error(errorMessage(data, res.status))
       }
       onExtracted(data as LabelExtractionResult)
       if (data?.notes) setNotes(data.notes)
@@ -96,11 +93,11 @@ export function LabelScanInput({ onExtracted, disabled }: Props) {
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-dashed border-stone-300 bg-stone-50/80 p-4">
+    <div className="panel space-y-3">
       <div>
-        <h2 className="text-xl font-semibold">Scan label</h2>
-        <p className="text-sm text-stone-600 mt-1">
-          Take a photo or upload a label image. Grok will suggest values for the form below — review before saving.
+        <h2 className="page-title" style={{ fontSize: '1.5rem' }}>Skann etikett</h2>
+        <p className="text-sm mt-1" style={{ color: 'var(--ink-soft)' }}>
+          Ta bilde eller last opp etikettsbilde. Grok foreslår verdier i skjemaet — sjekk før du lagrer.
         </p>
       </div>
 
@@ -109,25 +106,25 @@ export function LabelScanInput({ onExtracted, disabled }: Props) {
           type="button"
           disabled={disabled || loading}
           onClick={() => cameraRef.current?.click()}
-          className="border rounded px-3 py-2 bg-white hover:bg-stone-100 disabled:opacity-50"
+          className="btn btn--ghost btn--small"
         >
-          Take photo
+          Ta bilde
         </button>
         <button
           type="button"
           disabled={disabled || loading}
           onClick={() => fileRef.current?.click()}
-          className="border rounded px-3 py-2 bg-white hover:bg-stone-100 disabled:opacity-50"
+          className="btn btn--ghost btn--small"
         >
-          Upload image
+          Last opp bilde
         </button>
         <button
           type="button"
           disabled={disabled || loading || !selectedFile}
           onClick={analyze}
-          className="border rounded px-3 py-2 bg-stone-800 text-white hover:bg-stone-900 disabled:bg-gray-400"
+          className="btn btn--primary btn--small"
         >
-          {loading ? 'Reading label…' : 'Fill form from label'}
+          {loading ? 'Leser etikett…' : 'Fyll skjema fra etikett'}
         </button>
       </div>
 
@@ -149,12 +146,12 @@ export function LabelScanInput({ onExtracted, disabled }: Props) {
 
       {previewUrl && (
         <div className="max-w-sm">
-          <img src={previewUrl} alt="Selected wine label preview" className="rounded border max-h-64 object-contain bg-white" />
+          <img src={previewUrl} alt="Forhåndsvisning av vinetikett" className="rounded border max-h-64 object-contain bg-white" />
         </div>
       )}
 
-      {error && <div className="text-sm text-red-600">{error}</div>}
-      {notes && !error && <div className="text-sm text-stone-600">Note: {notes}</div>}
+      {error && <div className="text-sm" style={{ color: 'var(--danger)' }}>{error}</div>}
+      {notes && !error && <div className="text-sm" style={{ color: 'var(--ink-soft)' }}>Merk: {notes}</div>}
     </div>
   )
 }

@@ -37,7 +37,7 @@ export default function InventoryTrackingSystemView({ wineId, initialQuantity, o
   return (
     <div className="space-y-4">
       <div>
-        <div className="text-sm text-gray-600 mb-1">Current Inventory</div>
+        <div className="text-sm text-gray-600 mb-1">Nåværende beholdning</div>
         <div className="flex items-center gap-4">
           <div className="text-lg font-semibold">{currentQuantity}</div>
           <InventoryUpdateControls wineId={wineId} currentQuantity={currentQuantity} onQuantityUpdated={handleQuantityUpdated} />
@@ -45,19 +45,19 @@ export default function InventoryTrackingSystemView({ wineId, initialQuantity, o
       </div>
 
       <div>
-        <div className="text-sm text-gray-600 mb-2">Inventory Change Log</div>
-        {loading && <div>Loading log...</div>}
+        <div className="text-sm text-gray-600 mb-2">Beholdningslogg</div>
+        {loading && <div>Laster logg…</div>}
         {error && <div className="text-red-600">Error: {error}</div>}
-        {!loading && !error && logs.length === 0 && <div>No log entries yet.</div>}
+        {!loading && !error && logs.length === 0 && <div>Ingen loggoppføringer ennå.</div>}
         {logs.length > 0 && (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>When</TableHead>
+                <TableHead>Når</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Change</TableHead>
-                <TableHead>New Qty</TableHead>
-                <TableHead>Notes</TableHead>
+                <TableHead>Endring</TableHead>
+                <TableHead>Nytt antall</TableHead>
+                <TableHead>Notater</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

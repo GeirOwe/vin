@@ -44,16 +44,16 @@ export function WineDetailsInput({ value, onChange, disabled }: WineDetailsInput
 
   const validate = () => {
     const newErrors: Record<string, string | null> = {}
-    if (!name.trim()) newErrors.name = 'Name is required'
-    if (!type.trim()) newErrors.type = 'Type is required'
-    if (!producer.trim()) newErrors.producer = 'Producer is required'
+    if (!name.trim()) newErrors.name = 'Navn er påkrevd'
+    if (!type.trim()) newErrors.type = 'Type er påkrevd'
+    if (!producer.trim()) newErrors.producer = 'Produsent er påkrevd'
 
     if (vintage.trim()) {
       if (!/^\d{4}$/.test(vintage.trim())) {
-        newErrors.vintage = 'Vintage must be a 4-digit year'
+        newErrors.vintage = 'Årgang må være et firesifret år'
       } else {
         const y = parseInt(vintage, 10)
-        if (isFutureYear(y)) newErrors.vintage = 'Vintage cannot be in the future'
+        if (isFutureYear(y)) newErrors.vintage = 'Årgang kan ikke være i fremtiden'
       }
     }
 
@@ -90,41 +90,41 @@ export function WineDetailsInput({ value, onChange, disabled }: WineDetailsInput
   return (
     <div className="grid gap-4">
       <div className={fieldClass}>
-        <Label htmlFor="name">Name</Label>
-        <Input id="name" placeholder="e.g., Barolo Riserva" value={name} onChange={e => setName(e.target.value)} disabled={disabled} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'name-error' : undefined} />
+        <Label htmlFor="name">Navn</Label>
+        <Input id="name" placeholder="f.eks. Barolo Riserva" value={name} onChange={e => setName(e.target.value)} disabled={disabled} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'name-error' : undefined} />
         {errors.name ? <span id="name-error" className={errorClass}>{errors.name}</span> : null}
       </div>
 
       <div className={fieldClass}>
         <Label htmlFor="type">Type</Label>
-        <Input id="type" placeholder="e.g., Red, White, Rosé" value={type} onChange={e => setType(e.target.value)} disabled={disabled} aria-invalid={!!errors.type} aria-describedby={errors.type ? 'type-error' : undefined} />
+        <Input id="type" placeholder="f.eks. Rød, Hvit, Rosé" value={type} onChange={e => setType(e.target.value)} disabled={disabled} aria-invalid={!!errors.type} aria-describedby={errors.type ? 'type-error' : undefined} />
         {errors.type ? <span id="type-error" className={errorClass}>{errors.type}</span> : null}
       </div>
 
       <div className={fieldClass}>
-        <Label htmlFor="producer">Producer</Label>
-        <Input id="producer" placeholder="e.g., Gaja" value={producer} onChange={e => setProducer(e.target.value)} disabled={disabled} aria-invalid={!!errors.producer} aria-describedby={errors.producer ? 'producer-error' : undefined} />
+        <Label htmlFor="producer">Produsent</Label>
+        <Input id="producer" placeholder="f.eks. Gaja" value={producer} onChange={e => setProducer(e.target.value)} disabled={disabled} aria-invalid={!!errors.producer} aria-describedby={errors.producer ? 'producer-error' : undefined} />
         {errors.producer ? <span id="producer-error" className={errorClass}>{errors.producer}</span> : null}
       </div>
 
       <div className={fieldClass}>
-        <Label htmlFor="vintage">Vintage</Label>
+        <Label htmlFor="vintage">Årgang</Label>
         <Input id="vintage" placeholder="YYYY" value={vintage} onChange={e => setVintage(e.target.value)} disabled={disabled} inputMode="numeric" aria-invalid={!!errors.vintage} aria-describedby={errors.vintage ? 'vintage-error' : undefined} />
         {errors.vintage ? <span id="vintage-error" className={errorClass}>{errors.vintage}</span> : null}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className={fieldClass}>
-          <Label htmlFor="country">Country</Label>
-          <Input id="country" placeholder="e.g., Italy" value={country} onChange={e => setCountry(e.target.value)} disabled={disabled} />
+          <Label htmlFor="country">Land</Label>
+          <Input id="country" placeholder="f.eks. Italia" value={country} onChange={e => setCountry(e.target.value)} disabled={disabled} />
         </div>
         <div className={fieldClass}>
-          <Label htmlFor="district">District</Label>
-          <Input id="district" placeholder="e.g., Piedmont" value={district} onChange={e => setDistrict(e.target.value)} disabled={disabled} />
+          <Label htmlFor="district">Distrikt</Label>
+          <Input id="district" placeholder="f.eks. Piemonte" value={district} onChange={e => setDistrict(e.target.value)} disabled={disabled} />
         </div>
         <div className={fieldClass}>
-          <Label htmlFor="subdistrict">Subdistrict</Label>
-          <Input id="subdistrict" placeholder="e.g., Barolo" value={subdistrict} onChange={e => setSubdistrict(e.target.value)} disabled={disabled} />
+          <Label htmlFor="subdistrict">Underdistrikt</Label>
+          <Input id="subdistrict" placeholder="f.eks. Barolo" value={subdistrict} onChange={e => setSubdistrict(e.target.value)} disabled={disabled} />
         </div>
       </div>
     </div>

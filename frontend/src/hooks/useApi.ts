@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { getStoredToken } from '../auth/AuthContext'
 
 export type ApiState<T> = {
   loading: boolean
@@ -7,8 +8,26 @@ export type ApiState<T> = {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+
 function buildUrl(url: string): string {
   return url.startsWith('http') ? url : `${API_BASE}${url}`
+}
+
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  const token = getStoredToken()
+  return {
+    ...(extra || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
+function errorMessage(data: any, status: number): string {
+  if (!data) return `Forespørsel feilet (${status})`
+  if (typeof data.detail === 'string') return data.detail
+  if (Array.isArray(data.detail)) {
+    return data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ')
+  }
+  return data.message || `Forespørsel feilet (${status})`
 }
 
 export function useApi<T = any>() {
@@ -19,14 +38,11 @@ export function useApi<T = any>() {
     try {
       const res = await fetch(buildUrl(url), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(body),
       })
       const data = await res.json().catch(() => null)
-      if (!res.ok) {
-        const message = (data && (data.detail || data.message)) || `Request failed (${res.status})`
-        throw new Error(message)
-      }
+      if (!res.ok) throw new Error(errorMessage(data, res.status))
       setState({ loading: false, data, error: null })
       return data
     } catch (err: any) {
@@ -38,12 +54,11 @@ export function useApi<T = any>() {
   const getJson = useCallback(async (url: string): Promise<T | null> => {
     setState({ loading: true, data: null, error: null })
     try {
-      const res = await fetch(buildUrl(url))
+      const res = await fetch(buildUrl(url), {
+        headers: authHeaders(),
+      })
       const data = await res.json().catch(() => null)
-      if (!res.ok) {
-        const message = (data && (data.detail || data.message)) || `Request failed (${res.status})`
-        throw new Error(message)
-      }
+      if (!res.ok) throw new Error(errorMessage(data, res.status))
       setState({ loading: false, data, error: null })
       return data
     } catch (err: any) {
@@ -57,14 +72,11 @@ export function useApi<T = any>() {
     try {
       const res = await fetch(buildUrl(url), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(body),
       })
       const data = await res.json().catch(() => null)
-      if (!res.ok) {
-        const message = (data && (data.detail || data.message)) || `Request failed (${res.status})`
-        throw new Error(message)
-      }
+      if (!res.ok) throw new Error(errorMessage(data, res.status))
       setState({ loading: false, data, error: null })
       return data
     } catch (err: any) {
@@ -75,3 +87,5 @@ export function useApi<T = any>() {
 
   return { ...state, postJson, getJson, patchJson }
 }
+
+export { API_BASE, authHeaders, buildUrl, errorMessage }

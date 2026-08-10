@@ -10,9 +10,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api.endpoints.wines import router as wines_router
+from .api.endpoints.auth import router as auth_router
 from .core.config import Settings
 from .core.logging import setup_logging, get_logger
 from .database import check_database_connection
+from .db_init import ensure_schema
 
 # Initialize settings
 settings = Settings.from_env()
@@ -32,7 +34,12 @@ async def lifespan(app: FastAPI):
     logger.info("Starting VIN API application...")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug mode: {settings.debug}")
-    
+
+    try:
+        ensure_schema()
+    except Exception as exc:
+        logger.error(f"Database schema init failed: {exc}")
+
     # Verify database connection on startup
     db_healthy, db_message = check_database_connection()
     if db_healthy:
@@ -75,7 +82,7 @@ async def root():
         "status": "ok",
         "service": "VIN API",
         "version": "1.0.0",
-        "routes": ["/api/wines"],
+        "routes": ["/api/auth", "/api/wines"],
     }
 
 # Health check endpoint
@@ -99,4 +106,5 @@ async def health():
     }
 
 # Include routers
+app.include_router(auth_router)
 app.include_router(wines_router)

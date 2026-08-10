@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 export default function AddNewWineButton() {
   const navigate = useNavigate()
   return (
-    <Button aria-label="Add new wine" onClick={() => navigate('/add-wine')}>
+    <Button aria-label="Add new wine" onClick={() => navigate('/legg-til')}>
       Add New Wine
     </Button>
   )

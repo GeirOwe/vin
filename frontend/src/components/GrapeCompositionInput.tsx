@@ -18,7 +18,7 @@ function debounce<T extends (...args: any[]) => void>(fn: T, delay: number) {
   }
 }
 
-function sanitizePercentageInput(value: string): string {
+function sanitizeProsentInput(value: string): string {
   // Allow digits and a single dot, max one decimal place
   const cleaned = value.replace(/[^0-9.]/g, '')
   const [whole, frac = ''] = cleaned.split('.')
@@ -46,23 +46,23 @@ export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompos
     let err: string | null = null
     for (const r of rows) {
       if (r.grape_variety.trim() === '') {
-        err = 'Grape variety name cannot be empty'
+        err = 'Druesort kan ikke være tom'
         break
       }
       if (r.percentage === '') continue
       const num = Number(r.percentage)
       if (!Number.isFinite(num) || num < 0 || num > 100) {
-        err = 'Percentages must be numbers between 0 and 100'
+        err = 'Prosent må være tall mellom 0 og 100'
         break
       }
       const frac = r.percentage.split('.')[1]
       if (frac && frac.length > 1) {
-        err = 'Percentages allow at most 1 decimal place'
+        err = 'Prosent tillater maks 1 desimal'
         break
       }
     }
     if (!err && total > 100.0 + 1e-9) {
-      err = 'Total percentage cannot exceed 100%'
+      err = 'Total prosent kan ikke overstige 100 %'
     }
 
     setErrors(err)
@@ -90,7 +90,7 @@ export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompos
           disabled={disabled}
           className="text-sm px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
         >
-          Add grape
+          Legg til drue
         </button>
       </div>
 
@@ -108,12 +108,12 @@ export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompos
               />
             </div>
             <div className="md:col-span-3 grid gap-1">
-              <Label htmlFor={`pct_${idx}`}>Percentage</Label>
+              <Label htmlFor={`pct_${idx}`}>Prosent</Label>
               <Input
                 id={`pct_${idx}`}
                 placeholder="e.g., 60.5"
                 value={row.percentage}
-                onChange={e => updateRow(idx, { percentage: sanitizePercentageInput(e.target.value) })}
+                onChange={e => updateRow(idx, { percentage: sanitizeProsentInput(e.target.value) })}
                 inputMode="decimal"
                 disabled={disabled}
                 aria-invalid={!!errors}
@@ -126,7 +126,7 @@ export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompos
                 disabled={disabled}
                 className="w-full text-sm px-3 py-2 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
               >
-                Remove
+                Fjern
               </button>
             </div>
           </div>
@@ -134,7 +134,7 @@ export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompos
       </div>
 
       <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-600">Total: {total.toFixed(1)}%</span>
+        <span className="text-gray-600">Totalt: {total.toFixed(1)}%</span>
         {errors ? <span className="text-red-600">{errors}</span> : null}
       </div>
     </div>

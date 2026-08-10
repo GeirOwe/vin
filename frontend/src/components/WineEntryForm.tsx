@@ -67,11 +67,13 @@ export default function WineEntryForm() {
   }
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-6">
       <LabelScanInput onExtracted={applyLabelExtraction} disabled={loading} />
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Wine Details</h2>
+      <div className="section space-y-4">
+        <div className="section__head">
+          <h2>Vindetaljer</h2>
+        </div>
         <WineDetailsInput
           key={`details-${formKey}`}
           value={prefill}
@@ -79,8 +81,10 @@ export default function WineEntryForm() {
         />
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Pricing & Quantity</h2>
+      <div className="section space-y-4">
+        <div className="section__head">
+          <h2>Pris og antall</h2>
+        </div>
         <PricingQuantityInput
           key={`pricing-${formKey}`}
           value={prefill}
@@ -88,8 +92,10 @@ export default function WineEntryForm() {
         />
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Drinking Window</h2>
+      <div className="section space-y-4">
+        <div className="section__head">
+          <h2>Drikkevindu</h2>
+        </div>
         <DrinkingWindowInput
           key={`drinking-${formKey}`}
           value={prefill}
@@ -97,8 +103,10 @@ export default function WineEntryForm() {
         />
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Grape Composition</h2>
+      <div className="section space-y-4">
+        <div className="section__head">
+          <h2>Druvesammensetning</h2>
+        </div>
         <GrapeCompositionInput
           key={`grapes-${formKey}`}
           value={prefill.grape_composition}
@@ -106,12 +114,12 @@ export default function WineEntryForm() {
         />
       </div>
 
-      <div className="pt-4">
-        <button onClick={submit} disabled={loading} className="border rounded px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400">
-          {loading ? 'Saving...' : 'Create Wine'}
+      <div className="pt-2">
+        <button onClick={submit} disabled={loading} className="btn btn--primary">
+          {loading ? 'Lagrer…' : 'Opprett vin'}
         </button>
-        {error && <div className="text-red-600 mt-2">{error}</div>}
-        {data && <div className="text-green-700 mt-2">Created!</div>}
+        {error && <div className="mt-2 text-sm" style={{ color: 'var(--danger)' }}>{error}</div>}
+        {data && <div className="mt-2 text-sm" style={{ color: 'var(--brand-accent)' }}>Opprettet!</div>}
       </div>
     </div>
   )

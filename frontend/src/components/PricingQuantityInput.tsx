@@ -55,14 +55,14 @@ export function PricingQuantityInput({ value, onChange, disabled, currencySymbol
 
     const parsedPrice = parseCurrency(priceInput ?? '')
     if (priceInput !== '') {
-      if (parsedPrice == null || parsedPrice < 0) errs.purchase_price = 'Price must be a positive number'
+      if (parsedPrice == null || parsedPrice < 0) errs.purchase_price = 'Pris må være et positivt tall'
       const decimals = priceInput.split('.')[1]
-      if (decimals && decimals.replace(/[^0-9]/g, '').length > 2) errs.purchase_price = 'Max 2 decimals'
+      if (decimals && decimals.replace(/[^0-9]/g, '').length > 2) errs.purchase_price = 'Maks 2 desimaler'
     }
 
     if (qtyInput !== '') {
-      if (!/^\d+$/.test(qtyInput)) errs.quantity = 'Quantity must be a positive integer'
-      else if (Number(qtyInput) <= 0) errs.quantity = 'Quantity must be greater than zero'
+      if (!/^\d+$/.test(qtyInput)) errs.quantity = 'Antall må være et positivt heltall'
+      else if (Number(qtyInput) <= 0) errs.quantity = 'Antall må være større enn null'
     }
 
     setErrors(errs)
@@ -78,7 +78,7 @@ export function PricingQuantityInput({ value, onChange, disabled, currencySymbol
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="grid gap-1">
-        <Label htmlFor="purchase_price">Purchase Price</Label>
+        <Label htmlFor="purchase_price">Kjøpspris</Label>
         <Input
           id="purchase_price"
           placeholder="0.00"
@@ -95,7 +95,7 @@ export function PricingQuantityInput({ value, onChange, disabled, currencySymbol
       </div>
 
       <div className="grid gap-1">
-        <Label htmlFor="quantity">Quantity</Label>
+        <Label htmlFor="quantity">Antall</Label>
         <Input
           id="quantity"
           placeholder="0"

@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session, selectinload
 
-from ...database import get_db, engine, Base
-from ...models import Wine, GrapeComposition, InventoryLog, TastingNote
+from ...database import get_db
+from ...models import User, Wine, GrapeComposition, InventoryLog, TastingNote
+from ...core.security import get_current_user
 from ...schemas import (
     WineCreateRequest,
     WineUpdateRequest,
@@ -30,10 +31,23 @@ from ...services.label_extraction_service import extract_wine_from_label_image, 
 from ...core.config import XaiConfig
 
 
-# Ensure tables exist (simple auto-create). In production, use Alembic migrations instead.
-Base.metadata.create_all(bind=engine)
-
 router = APIRouter(prefix="/api/wines", tags=["wines"])
+
+
+def get_owned_wine(
+    db: Session,
+    wine_id: int,
+    user_id: int,
+    *,
+    load_grapes: bool = False,
+) -> Wine:
+    stmt = select(Wine).where(Wine.id == wine_id, Wine.user_id == user_id)
+    if load_grapes:
+        stmt = stmt.options(selectinload(Wine.grape_compositions))
+    wine = db.execute(stmt).scalar_one_or_none()
+    if wine is None:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Vin ikke funnet")
+    return wine
 
 
 def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType], vintage: Optional[int], country: Optional[str], district: Optional[str], subdistrict: Optional[str], drinking_window_status: Optional[str] = None):
@@ -92,6 +106,7 @@ def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType
 @router.get("", response_model=List[WineResponse])
 def list_wines(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     search_term: Optional[str] = Query(None),
     wine_type: Optional[WineType] = Query(None),
     vintage: Optional[int] = Query(None, ge=1800, le=2100),
@@ -102,7 +117,12 @@ def list_wines(
     quantity_filter: Optional[str] = Query("non_zero", pattern="^(non_zero|zero|all)$"),
 ) -> List[WineResponse]:
     try:
-        stmt = select(Wine).options(selectinload(Wine.grape_compositions)).order_by(Wine.id.desc())
+        stmt = (
+            select(Wine)
+            .options(selectinload(Wine.grape_compositions))
+            .where(Wine.user_id == current_user.id)
+            .order_by(Wine.id.desc())
+        )
         stmt = apply_filters(stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
         
         # Apply quantity filter (default: exclude zero quantity wines)
@@ -141,6 +161,7 @@ def list_wines(
 @router.get("/page", response_model=WineListPageResponse)
 def list_wines_page(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     sort_by: str = Query("id", pattern="^(id|name|producer|vintage|type)$"),
@@ -156,7 +177,11 @@ def list_wines_page(
 ) -> WineListPageResponse:
     try:
         # Base query with eager load to prevent N+1
-        base_stmt = select(Wine).options(selectinload(Wine.grape_compositions))
+        base_stmt = (
+            select(Wine)
+            .options(selectinload(Wine.grape_compositions))
+            .where(Wine.user_id == current_user.id)
+        )
         base_stmt = apply_filters(base_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
         
         # Apply quantity filter (default: exclude zero quantity wines)
@@ -227,14 +252,13 @@ def list_wines_page(
 
 
 @router.get("/{wine_id}", response_model=WineResponse)
-def get_wine(wine_id: int, db: Session = Depends(get_db)) -> WineResponse:
+def get_wine(
+    wine_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> WineResponse:
     try:
-        stmt = select(Wine).options(selectinload(Wine.grape_compositions)).where(Wine.id == wine_id)
-        wine = db.execute(stmt).scalar_one_or_none()
-        
-        if wine is None:
-            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
-        
+        wine = get_owned_wine(db, wine_id, current_user.id, load_grapes=True)
         return WineResponse(
             id=wine.id,
             name=wine.name,
@@ -263,15 +287,11 @@ def get_wine(wine_id: int, db: Session = Depends(get_db)) -> WineResponse:
 def update_wine(
     wine_id: int, 
     payload: WineUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> WineResponse:
     try:
-        # Get the wine
-        stmt = select(Wine).where(Wine.id == wine_id)
-        wine = db.execute(stmt).scalar_one_or_none()
-        
-        if wine is None:
-            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        wine = get_owned_wine(db, wine_id, current_user.id)
         
         # Update fields if provided
         update_data = payload.model_dump(exclude_unset=True)
@@ -310,15 +330,11 @@ def update_wine(
 def update_wine_quantity(
     wine_id: int, 
     payload: WineQuantityUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> WineResponse:
     try:
-        # Find the wine
-        stmt = select(Wine).options(selectinload(Wine.grape_compositions)).where(Wine.id == wine_id)
-        wine = db.execute(stmt).scalar_one_or_none()
-        
-        if wine is None:
-            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        wine = get_owned_wine(db, wine_id, current_user.id, load_grapes=True)
         
         # Calculate new quantity
         current_quantity = wine.quantity or 0
@@ -376,17 +392,15 @@ def update_wine_quantity(
 @router.get("/{wine_id}/inventory-log", response_model=List[InventoryLogResponse])
 def get_wine_inventory_log(
     wine_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> List[InventoryLogResponse]:
     """
     Retrieve inventory change history for a specific wine.
     Returns inventory log entries ordered by timestamp descending (most recent first).
     """
     try:
-        # Verify wine exists
-        wine = db.execute(select(Wine).where(Wine.id == wine_id)).scalar_one_or_none()
-        if wine is None:
-            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        get_owned_wine(db, wine_id, current_user.id)
         
         # Get inventory logs for the wine, ordered by timestamp descending
         stmt = (
@@ -418,18 +432,14 @@ def get_wine_inventory_log(
 def consume_wine(
     wine_id: int,
     tasting_request: TastingNoteCreateRequest = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> WineConsumptionResponse:
     """
     Record wine consumption by decrementing quantity by 1 and optionally creating a tasting note.
     """
     try:
-        # Find the wine
-        stmt = select(Wine).options(selectinload(Wine.grape_compositions)).where(Wine.id == wine_id)
-        wine = db.execute(stmt).scalar_one_or_none()
-        
-        if wine is None:
-            raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wine not found")
+        wine = get_owned_wine(db, wine_id, current_user.id, load_grapes=True)
         
         # Check current quantity
         current_quantity = wine.quantity or 0
@@ -458,11 +468,9 @@ def consume_wine(
         tasting_note = None
         if tasting_request and (tasting_request.rating is not None or tasting_request.notes):
             # For now, use a placeholder user_id. In production, this would come from authentication
-            user_id = 1  # Placeholder user ID
-            
             tasting_note = TastingNote(
                 wine_id=wine_id,
-                user_id=user_id,
+                user_id=current_user.id,
                 rating=tasting_request.rating,
                 notes=tasting_request.notes
             )
@@ -533,6 +541,7 @@ def consume_wine(
 async def drinking_window_suggestions(
     wine_type: SupportedWineType = Query(..., description="Wine type e.g., Red, White, Rosé, Sparkling, Dessert, Fortified"),
     vintage: int = Query(..., ge=1800, le=2100, description="Vintage year"),
+    current_user: User = Depends(get_current_user),
 ) -> DrinkingWindowSuggestionResponse:
     try:
         return await fetch_drinking_window_suggestion(wine_type=wine_type, vintage=vintage)
@@ -543,6 +552,7 @@ async def drinking_window_suggestions(
 @router.post("/extract-from-label", response_model=LabelExtractionResponse)
 async def extract_from_label(
     image: UploadFile = File(..., description="Wine label photo (JPEG, PNG, or WebP)"),
+    current_user: User = Depends(get_current_user),
 ) -> LabelExtractionResponse:
     """
     Analyze a wine label image with Grok (xAI) and return suggested form fields.
@@ -567,37 +577,43 @@ async def extract_from_label(
 
 
 @router.post("", response_model=WineResponse, status_code=HTTPStatus.CREATED)
-def create_wine(payload: WineCreateRequest, db: Session = Depends(get_db)) -> WineResponse:
+def create_wine(
+    payload: WineCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> WineResponse:
     try:
-        with db.begin():
-            wine = Wine(
-                name=payload.name,
-                type=payload.type,
-                producer=payload.producer,
-                vintage=payload.vintage,
-                country=payload.country,
-                district=payload.district,
-                subdistrict=payload.subdistrict,
-                purchase_price=payload.purchase_price,
-                quantity=payload.quantity,
-                drink_after_date=payload.drink_after_date,
-                drink_before_date=payload.drink_before_date,
-            )
-            db.add(wine)
-            db.flush()  # Ensure wine.id is available
+        wine = Wine(
+            user_id=current_user.id,
+            name=payload.name,
+            type=payload.type,
+            producer=payload.producer,
+            vintage=payload.vintage,
+            country=payload.country,
+            district=payload.district,
+            subdistrict=payload.subdistrict,
+            purchase_price=payload.purchase_price,
+            quantity=payload.quantity,
+            drink_after_date=payload.drink_after_date,
+            drink_before_date=payload.drink_before_date,
+        )
+        db.add(wine)
+        db.flush()
 
-            created_grapes: List[GrapeComposition] = []
-            if payload.grape_composition:
-                for gc in payload.grape_composition:
-                    gc_row = GrapeComposition(
-                        wine_id=wine.id,
-                        grape_variety=gc.grape_variety,
-                        percentage=gc.percentage,
-                    )
-                    db.add(gc_row)
-                    created_grapes.append(gc_row)
+        created_grapes: List[GrapeComposition] = []
+        if payload.grape_composition:
+            for gc in payload.grape_composition:
+                gc_row = GrapeComposition(
+                    wine_id=wine.id,
+                    grape_variety=gc.grape_variety,
+                    percentage=gc.percentage,
+                )
+                db.add(gc_row)
+                created_grapes.append(gc_row)
 
-        # session committed successfully
+        db.commit()
+        db.refresh(wine)
+
         return WineResponse(
             id=wine.id,
             name=wine.name,
@@ -617,8 +633,9 @@ def create_wine(payload: WineCreateRequest, db: Session = Depends(get_db)) -> Wi
             ],
         )
     except HTTPException:
+        db.rollback()
         raise
     except Exception as exc:
-        # Any exception should trigger rollback due to context manager; return 500
+        db.rollback()
         raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc))
 

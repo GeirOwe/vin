@@ -28,14 +28,14 @@ export default function WineDetailView() {
     }
   }, [id, getJson])
 
-  if (loading) return <div className="p-4">Loading wine details...</div>
-  if (error) return <div className="p-4 text-red-600">Error: {error}</div>
-  if (!data) return <div className="p-4">No wine data available</div>
+  if (loading) return <div className="empty-state">Laster vindetaljer…</div>
+  if (error) return <div className="text-sm" style={{ color: 'var(--danger)' }}>Feil: {error}</div>
+  if (!data) return <div className="empty-state">Ingen vindata tilgjengelig</div>
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="mb-2 text-sm">
-        <Link className="underline hover:text-blue-600" to="/">← Back to collection</Link>
+    <div className="section space-y-4">
+      <div className="text-sm" style={{ color: 'var(--ink-soft)' }}>
+        <Link to="/" style={{ textDecoration: 'none' }}>← Tilbake til samlingen</Link>
       </div>
       
       <WineInformationDisplay 

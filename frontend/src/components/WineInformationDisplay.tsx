@@ -63,7 +63,7 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
     }
   }
 
-  const handleCancelCoreEdit = () => {
+  const handleAvbrytCoreEdit = () => {
     setName(wine.name)
     setProducer(wine.producer || '')
     setVintage(wine.vintage?.toString() || '')
@@ -92,7 +92,7 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
     }
   }
 
-  const handleCancelDrinkingWindowEdit = () => {
+  const handleAvbrytDrinkingWindowEdit = () => {
     setDrinkAfterDate(wine.drink_after_date || '')
     setDrinkBeforeDate(wine.drink_before_date || '')
     setIsEditingDrinkingWindow(false)
@@ -122,7 +122,7 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Core Information</CardTitle>
+            <CardTitle className="text-lg">Kjerneinformasjon</CardTitle>
             {!isEditingCore && (
               <Button
                 variant="outline"
@@ -139,21 +139,21 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Navn</label>
                   <Input value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Producer</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Produsent</label>
                   <Input value={producer} onChange={(e) => setProducer(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Vintage</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Årgang</label>
                   <Input type="number" value={vintage} onChange={(e) => setVintage(e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Type</label>
                   <select value={type} onChange={(e) => setType(e.target.value)} className="w-full border rounded px-3 py-2">
-                    <option value="">Select type</option>
+                    <option value="">Velg type</option>
                     <option value="Red">Red</option>
                     <option value="White">White</option>
                     <option value="Rose">Rose</option>
@@ -164,26 +164,26 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleSaveCore} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
-                  {isSaving ? 'Saving...' : 'Save'}
+                <Button onClick={handleSaveCore} disabled={isSaving}>
+                  {isSaving ? 'Lagrer…' : 'Lagre'}
                 </Button>
-                <Button variant="outline" onClick={handleCancelCoreEdit} disabled={isSaving}>
-                  Cancel
+                <Button variant="outline" onClick={handleAvbrytCoreEdit} disabled={isSaving}>
+                  Avbryt
                 </Button>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="text-sm font-medium text-gray-600">Name</span>
+                <span className="text-sm font-medium text-gray-600">Navn</span>
                 <p className="text-lg font-semibold">{wine.name}</p>
               </div>
               <div>
-                <span className="text-sm font-medium text-gray-600">Producer</span>
+                <span className="text-sm font-medium text-gray-600">Produsent</span>
                 <p className="text-lg">{wine.producer || '—'}</p>
               </div>
               <div>
-                <span className="text-sm font-medium text-gray-600">Vintage</span>
+                <span className="text-sm font-medium text-gray-600">Årgang</span>
                 <p className="text-lg">{wine.vintage ?? '—'}</p>
               </div>
               <div>
@@ -195,39 +195,39 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
         </CardContent>
       </Card>
 
-      {/* Geographic */}
+      {/* Geografi */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Geographic</CardTitle>
+          <CardTitle className="text-lg">Geografi</CardTitle>
         </CardHeader>
         <CardContent>
           {isEditingCore ? (
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Country</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Land</label>
                 <Input value={country} onChange={(e) => setCountry(e.target.value)} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">District</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Distrikt</label>
                 <Input value={district} onChange={(e) => setDistrict(e.target.value)} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Subdistrict</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Underdistrikt</label>
                 <Input value={subdistrict} onChange={(e) => setSubdistrict(e.target.value)} />
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <span className="text-sm font-medium text-gray-600">Country</span>
+                <span className="text-sm font-medium text-gray-600">Land</span>
                 <p className="text-lg">{wine.country || '—'}</p>
               </div>
               <div>
-                <span className="text-sm font-medium text-gray-600">District</span>
+                <span className="text-sm font-medium text-gray-600">Distrikt</span>
                 <p className="text-lg">{wine.district || '—'}</p>
               </div>
               <div>
-                <span className="text-sm font-medium text-gray-600">Subdistrict</span>
+                <span className="text-sm font-medium text-gray-600">Underdistrikt</span>
                 <p className="text-lg">{wine.subdistrict || '—'}</p>
               </div>
             </div>
@@ -238,20 +238,20 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
       {/* Pricing */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Pricing</CardTitle>
+          <CardTitle className="text-lg">Pris</CardTitle>
         </CardHeader>
         <CardContent>
           {isEditingCore ? (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Purchase Price</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Kjøpspris</label>
                 <Input type="number" step="0.01" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} placeholder="0.00" />
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="text-sm font-medium text-gray-600">Purchase Price</span>
+                <span className="text-sm font-medium text-gray-600">Kjøpspris</span>
                 <p className="text-lg font-semibold text-green-600">{formatPrice(wine.purchase_price)}</p>
               </div>
             </div>
@@ -259,18 +259,18 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
         </CardContent>
       </Card>
 
-      {/* Drinking Window - Always show, even if empty */}
+      {/* Drikkevindu - Always show, even if empty */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Drinking Window</CardTitle>
+            <CardTitle className="text-lg">Drikkevindu</CardTitle>
             {!isEditingDrinkingWindow && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsEditingDrinkingWindow(true)}
               >
-                {wine.drink_after_date || wine.drink_before_date ? 'Edit' : 'Add'}
+                {wine.drink_after_date || wine.drink_before_date ? 'Rediger' : 'Legg til'}
               </Button>
             )}
           </div>
@@ -280,7 +280,7 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Drink After Date
+                    Drikk etter Date
                   </label>
                   <Input
                     type="date"
@@ -291,7 +291,7 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Drink Before Date
+                    Drikk før Date
                   </label>
                   <Input
                     type="date"
@@ -304,23 +304,22 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
                   <Button
                     onClick={handleSaveDrinkingWindow}
                     disabled={isSaving}
-                    className="bg-blue-600 hover:bg-blue-700"
                   >
-                    {isSaving ? 'Saving...' : 'Save'}
+                    {isSaving ? 'Lagrer…' : 'Lagre'}
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={handleCancelDrinkingWindowEdit}
+                    onClick={handleAvbrytDrinkingWindowEdit}
                     disabled={isSaving}
                   >
-                    Cancel
+                    Avbryt
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
                 <div>
-                  <span className="text-sm font-medium text-gray-600">Recommended Period</span>
+                  <span className="text-sm font-medium text-gray-600">Anbefalt periode</span>
                   <p className="text-base">{formatDrinkingWindow(wine.drink_after_date, wine.drink_before_date)}</p>
                 </div>
               </div>
@@ -328,10 +327,10 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
           </CardContent>
         </Card>
 
-      {/* Grape Composition - Always show, even if empty */}
+      {/* Druvesammensetning - Always show, even if empty */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Grape Composition</CardTitle>
+          <CardTitle className="text-lg">Druvesammensetning</CardTitle>
         </CardHeader>
         <CardContent>
           {wine.grape_composition && wine.grape_composition.length > 0 ? (
@@ -344,7 +343,7 @@ export default function WineInformationDisplay({ wine, onQuantityUpdate, onWineU
               ))}
             </div>
           ) : (
-            <div className="text-gray-500 italic">No grape composition information available</div>
+            <div className="text-gray-500 italic">Ingen druvesammensetning registrert</div>
           )}
         </CardContent>
       </Card>

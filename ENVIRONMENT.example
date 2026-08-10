@@ -26,3 +26,6 @@ XAI_API_KEY=your_xai_api_key_here
 # Optional overrides:
 # XAI_API_BASE=https://api.x.ai/v1
 # XAI_MODEL=grok-4
+
+# Auth (JWT signing) — set a strong random value in production / Render
+SECRET_KEY=change-me-to-a-long-random-string

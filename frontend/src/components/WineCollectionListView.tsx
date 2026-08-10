@@ -33,6 +33,7 @@ export default function WineCollectionListView({
   endpoint = '/page', 
   showSearchAndSort = true,
   filterParams,
+  emptyStateMessage,
 }: WineCollectionListViewProps) {
   const navigate = useNavigate()
   const { loading, error, data, getJson } = useApi<PaginatedResponse<WineListItem> | WineListItem[]>()
@@ -88,46 +89,71 @@ export default function WineCollectionListView({
   }
 
   return (
-    <div className="p-4">
+    <div className="section">
       {showSearchAndSort && (
-        <div className="mb-4 flex gap-2 items-center">
+        <div className="section__head">
+          <h2>Din samling</h2>
+          <p>Søk og sorter for å finne flaskene raskt.</p>
+        </div>
+      )}
+
+      {showSearchAndSort && (
+        <div className="toolbar">
           <input
-            className="border rounded px-2 py-1 w-64"
-            placeholder="Search by name or producer"
+            className="field-control min-w-[12rem] flex-1"
+            placeholder="Søk på navn eller produsent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <select className="border rounded px-2 py-1" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
-            <option value="id">Newest</option>
-            <option value="name">Name</option>
-            <option value="producer">Producer</option>
-            <option value="vintage">Vintage</option>
+          <select className="field-control" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
+            <option value="id">Nyeste</option>
+            <option value="name">Navn</option>
+            <option value="producer">Produsent</option>
+            <option value="vintage">Årgang</option>
             <option value="type">Type</option>
           </select>
-          <select className="border rounded px-2 py-1" value={sortOrder} onChange={(e) => setSortOrder(e.target.value as SortOrder)}>
-            <option value="desc">Desc</option>
-            <option value="asc">Asc</option>
+          <select className="field-control" value={sortOrder} onChange={(e) => setSortOrder(e.target.value as SortOrder)}>
+            <option value="desc">Synkende</option>
+            <option value="asc">Stigende</option>
           </select>
         </div>
       )}
 
-      {loading && <div>Loading...</div>}
-      {error && <div className="text-red-600">Error: {error}</div>}
+      {loading && <div className="empty-state">Laster…</div>}
+      {error && <div className="text-sm" style={{ color: 'var(--danger)' }}>Feil: {error}</div>}
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {!loading && wines.length === 0 && (
+        <div className="empty-state">{emptyStateMessage || 'Ingen viner funnet.'}</div>
+      )}
+
+      <ul className="entity-list">
         {wines.map((w) => (
-          <WineEntryDisplayCard key={w.id} wine={w} onClick={() => handleWineClick(w.id)} />
+          <li key={w.id}>
+            <WineEntryDisplayCard wine={w} onClick={() => handleWineClick(w.id)} />
+          </li>
         ))}
-      </div>
+      </ul>
 
-      {data && !Array.isArray(data) && (
-        <div className="flex gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="border rounded px-3 py-1">
-            Prev
+      {data && !Array.isArray(data) && data.total_pages > 1 && (
+        <div className="toolbar mt-4">
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="btn btn--ghost btn--small"
+          >
+            Forrige
           </button>
-          <span className="px-2 py-1">Page {page} of {data.total_pages}</span>
-          <button disabled={page >= data.total_pages} onClick={() => setPage((p) => Math.min(data.total_pages, p + 1))} className="border rounded px-3 py-1">
-            Next
+          <span className="text-sm" style={{ color: 'var(--muted-text)' }}>
+            Side {page} av {data.total_pages}
+          </span>
+          <button
+            type="button"
+            disabled={page >= data.total_pages}
+            onClick={() => setPage((p) => Math.min(data.total_pages, p + 1))}
+            className="btn btn--ghost btn--small"
+          >
+            Neste
           </button>
         </div>
       )}

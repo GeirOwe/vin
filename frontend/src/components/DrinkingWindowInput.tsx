@@ -43,7 +43,7 @@ export default function DrinkingWindowInput({ onChange, value }: Props) {
       {/* Manual date inputs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="grid gap-1">
-          <Label htmlFor="drink_after_date">Drink After Date</Label>
+          <Label htmlFor="drink_after_date">Drikk etter</Label>
           <Input
             id="drink_after_date"
             type="date"
@@ -52,7 +52,7 @@ export default function DrinkingWindowInput({ onChange, value }: Props) {
           />
         </div>
         <div className="grid gap-1">
-          <Label htmlFor="drink_before_date">Drink Before Date</Label>
+          <Label htmlFor="drink_before_date">Drikk før</Label>
           <Input
             id="drink_before_date"
             type="date"
@@ -64,10 +64,10 @@ export default function DrinkingWindowInput({ onChange, value }: Props) {
 
       {/* Optional: Get suggestion from API */}
       <div className="border-t pt-4">
-        <div className="text-sm font-medium text-gray-600 mb-2">Or get suggestion based on wine type and vintage:</div>
+        <div className="text-sm font-medium text-gray-600 mb-2">Eller hent forslag basert på type og årgang:</div>
         <div className="flex gap-2 items-end">
           <div className="grid gap-1 flex-1">
-            <Label htmlFor="suggestion_wine_type">Wine Type</Label>
+            <Label htmlFor="suggestion_wine_type">Vintype</Label>
             <select
               id="suggestion_wine_type"
               value={wineType}
@@ -83,11 +83,11 @@ export default function DrinkingWindowInput({ onChange, value }: Props) {
             </select>
           </div>
           <div className="grid gap-1 flex-1">
-            <Label htmlFor="suggestion_vintage">Vintage</Label>
+            <Label htmlFor="suggestion_vintage">Årgang</Label>
             <Input
               id="suggestion_vintage"
               type="number"
-              placeholder="e.g., 2020"
+              placeholder="f.eks. 2020"
               value={vintage}
               onChange={(e) => setVintage(e.target.value ? Number(e.target.value) : '')}
             />
@@ -98,7 +98,7 @@ export default function DrinkingWindowInput({ onChange, value }: Props) {
             disabled={!wineType || !vintage || loadingSuggestion}
             variant="outline"
           >
-            {loadingSuggestion ? 'Loading...' : 'Get Suggestion'}
+            {loadingSuggestion ? 'Loading...' : 'Hent forslag'}
           </Button>
         </div>
         {data && (

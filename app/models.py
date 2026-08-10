@@ -25,12 +25,26 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 
 
+class User(Base):
+    """Application user — login via bruker_id + password (Owen Labs / Stuff pattern)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    bruker_id: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    wines: Mapped[List["Wine"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+
+
 class Wine(Base):
     """
     Wine entity representing a wine in the collection.
     
     Attributes:
         id: Primary key
+        user_id: Owning user
         name: Wine name (required)
         type: Wine type (Red, White, Rosé, Sparkling, Dessert, Fortified)
         producer: Wine producer name
@@ -62,6 +76,7 @@ class Wine(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     producer: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -73,6 +88,8 @@ class Wine(Base):
     quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     drink_after_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     drink_before_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    owner: Mapped[User] = relationship(back_populates="wines")
 
     grape_compositions: Mapped[List["GrapeComposition"]] = relationship(
         back_populates="wine", cascade="all, delete-orphan"
@@ -170,7 +187,9 @@ class TastingNote(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     wine_id: Mapped[int] = mapped_column(ForeignKey("wines.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # In production, this would be a proper user relationship
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Rating scale 1-10
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
