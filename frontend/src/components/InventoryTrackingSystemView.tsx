@@ -35,43 +35,49 @@ export default function InventoryTrackingSystemView({ wineId, initialQuantity, o
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <div className="text-sm text-gray-600 mb-1">Nåværende beholdning</div>
-        <div className="flex items-center gap-4">
-          <div className="text-lg font-semibold">{currentQuantity}</div>
+        <span className="wine-field__label">Nåværende beholdning</span>
+        <div className="flex items-center gap-4 mt-1">
+          <div className="wine-field__value" style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem' }}>
+            {currentQuantity}
+          </div>
           <InventoryUpdateControls wineId={wineId} currentQuantity={currentQuantity} onQuantityUpdated={handleQuantityUpdated} />
         </div>
       </div>
 
       <div>
-        <div className="text-sm text-gray-600 mb-2">Beholdningslogg</div>
-        {loading && <div>Laster logg…</div>}
-        {error && <div className="text-red-600">Error: {error}</div>}
-        {!loading && !error && logs.length === 0 && <div>Ingen loggoppføringer ennå.</div>}
+        <span className="wine-field__label">Beholdningslogg</span>
+        {loading && <div className="empty-state" style={{ paddingTop: '0.75rem' }}>Laster logg…</div>}
+        {error && <div className="text-sm mt-2" style={{ color: 'var(--danger)' }}>Feil: {error}</div>}
+        {!loading && !error && logs.length === 0 && (
+          <p className="empty-state" style={{ paddingTop: '0.75rem' }}>Ingen loggoppføringer ennå.</p>
+        )}
         {logs.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Når</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Endring</TableHead>
-                <TableHead>Nytt antall</TableHead>
-                <TableHead>Notater</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                  <TableCell>{log.change_type}</TableCell>
-                  <TableCell>{log.quantity_change > 0 ? `+${log.quantity_change}` : log.quantity_change}</TableCell>
-                  <TableCell>{log.new_quantity}</TableCell>
-                  <TableCell>{log.notes || '—'}</TableCell>
+          <div className="mt-2 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Når</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Endring</TableHead>
+                  <TableHead>Nytt antall</TableHead>
+                  <TableHead>Notater</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell>{new Date(log.timestamp).toLocaleString('nb-NO')}</TableCell>
+                    <TableCell>{log.change_type}</TableCell>
+                    <TableCell>{log.quantity_change > 0 ? `+${log.quantity_change}` : log.quantity_change}</TableCell>
+                    <TableCell>{log.new_quantity}</TableCell>
+                    <TableCell>{log.notes || '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </div>
     </div>

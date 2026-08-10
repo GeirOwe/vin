@@ -8,6 +8,7 @@ export type GrapeCompositionInputProps = {
   value?: GrapeComposition[]
   onChange: (grapes: GrapeComposition[]) => void
   disabled?: boolean
+  showHeading?: boolean
 }
 
 function debounce<T extends (...args: any[]) => void>(fn: T, delay: number) {
@@ -29,7 +30,7 @@ function sanitizeProsentInput(value: string): string {
     : sanitizedWhole
 }
 
-export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompositionInputProps) {
+export function GrapeCompositionInput({ value, onChange, disabled, showHeading = true }: GrapeCompositionInputProps) {
   const [rows, setRows] = useState<Array<{ grape_variety: string; percentage: string }>>(
     (value ?? []).map(g => ({ grape_variety: g.grape_variety, percentage: String(g.percentage) }))
   )
@@ -83,12 +84,12 @@ export function GrapeCompositionInput({ value, onChange, disabled }: GrapeCompos
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-medium">Druer</h3>
+        {showHeading ? <h3 className="text-base font-medium">Druer</h3> : <span />}
         <button
           type="button"
           onClick={addRow}
           disabled={disabled}
-          className="text-sm px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+          className="btn btn--ghost btn--small"
         >
           Legg til drue
         </button>

@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Wine } from '../types/wine'
 import { useApi } from '../hooks/useApi'
 import InventoryTrackingSystemView from './InventoryTrackingSystemView'
 import { GrapeCompositionInput, type GrapeComposition } from './GrapeCompositionInput'
-import { WineLabelThumb } from './WineLabelThumb'
+import { WineLabelLightbox, WineLabelThumb } from './WineLabelThumb'
 
 interface WineInformationDisplayProps {
   wine: Wine
@@ -77,6 +75,7 @@ export default function WineInformationDisplay({
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   const { patchJson } = useApi()
 
@@ -238,317 +237,332 @@ export default function WineInformationDisplay({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="wine-detail">
       {saveError && (
-        <div className="text-sm" style={{ color: 'var(--danger)' }}>
+        <div className="text-sm mb-3" style={{ color: 'var(--danger)' }}>
           {saveError}
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Om</CardTitle>
-            {!isEditingOm && (
-              <Button variant="outline" size="sm" onClick={() => setIsEditingOm(true)}>
-                Rediger
-              </Button>
-            )}
+      <WineLabelLightbox
+        wineId={wine.id}
+        alt={`Etikett for ${wine.name}`}
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+      />
+
+      {!isEditingOm && (
+        <div className="wine-detail__hero">
+          <WineLabelThumb
+            key={`hero-thumb-${labelThumbKey}`}
+            wineId={wine.id}
+            enabled={Boolean(wine.has_label_image)}
+            alt={`Etikett for ${wine.name}`}
+            className="entity-row__thumb--lg"
+            onOpen={wine.has_label_image ? () => setLightboxOpen(true) : undefined}
+          />
+          <div>
+            <h1 className="wine-detail__title">{wine.name}</h1>
+            <p className="wine-detail__sub">
+              {[wine.producer, wine.vintage].filter(Boolean).join(' · ') || '—'}
+            </p>
+            <p className="wine-detail__meta">
+              {[wine.type, wine.country, wine.district].filter(Boolean).join(' · ') || 'Uten sted'}
+              {wine.purchase_price != null ? ` · ${formatPrice(wine.purchase_price)}` : ''}
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          {isEditingOm ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Navn</label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Produsent</label>
-                  <Input value={producer} onChange={(e) => setProducer(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Årgang</label>
-                  <Input type="number" value={vintage} onChange={(e) => setVintage(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Type</label>
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value)}
-                    className="w-full border rounded px-3 py-2 field-control"
-                  >
-                    <option value="">Velg type</option>
-                    <option value="Red">Rød</option>
-                    <option value="White">Hvit</option>
-                    <option value="Rose">Rosé</option>
-                    <option value="Sparkling">Musserende</option>
-                    <option value="Dessert">Dessert</option>
-                    <option value="Fortified">Sterkvin</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Kjøpspris</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={purchasePrice}
-                    onChange={(e) => setPurchasePrice(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
+        </div>
+      )}
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Land</label>
-                  <Input value={country} onChange={(e) => setCountry(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Distrikt</label>
-                  <Input value={district} onChange={(e) => setDistrict(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Underdistrikt</label>
-                  <Input value={subdistrict} onChange={(e) => setSubdistrict(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-600">Etikettbilde</label>
-                <div className="flex flex-wrap items-start gap-3">
-                  {labelPreview ? (
-                    <img
-                      src={labelPreview}
-                      alt="Nytt etikettbilde"
-                      className="entity-row__thumb"
-                      style={{ width: 72, height: 96 }}
-                    />
-                  ) : (
-                    <WineLabelThumb
-                      key={`edit-thumb-${labelThumbKey}`}
-                      wineId={wine.id}
-                      enabled={Boolean(wine.has_label_image)}
-                      alt={`Etikett for ${wine.name}`}
-                    />
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <label className="btn btn--ghost btn--small cursor-pointer">
-                      {wine.has_label_image || labelImage ? 'Bytt bilde' : 'Legg til bilde'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => onLabelFile(e.target.files?.[0] ?? null)}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button onClick={handleSaveOm} disabled={isSaving}>
-                  {isSaving ? 'Lagrer…' : 'Lagre'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    resetOmFields()
-                    setIsEditingOm(false)
-                  }}
-                  disabled={isSaving}
-                >
-                  Avbryt
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex gap-4 items-start">
-                <WineLabelThumb
-                  key={`view-thumb-${labelThumbKey}`}
-                  wineId={wine.id}
-                  enabled={Boolean(wine.has_label_image)}
-                  alt={`Etikett for ${wine.name}`}
-                />
-                <div className="grid grid-cols-2 gap-4 flex-1">
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Navn</span>
-                    <p className="text-lg font-semibold">{wine.name}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Produsent</span>
-                    <p className="text-lg">{wine.producer || '—'}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Årgang</span>
-                    <p className="text-lg">{wine.vintage ?? '—'}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Type</span>
-                    <p className="text-lg">{wine.type || '—'}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Kjøpspris</span>
-                    <p className="text-lg font-semibold" style={{ color: 'var(--brand-accent)' }}>
-                      {formatPrice(wine.purchase_price)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <span className="text-sm font-medium text-gray-600">Land</span>
-                  <p className="text-lg">{wine.country || '—'}</p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-gray-600">Distrikt</span>
-                  <p className="text-lg">{wine.district || '—'}</p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-gray-600">Underdistrikt</span>
-                  <p className="text-lg">{wine.subdistrict || '—'}</p>
-                </div>
-              </div>
-            </div>
+      <section className="wine-block">
+        <div className="wine-block__head">
+          <h2>Om</h2>
+          {!isEditingOm && (
+            <button type="button" className="btn btn--ghost btn--small" onClick={() => setIsEditingOm(true)}>
+              Rediger
+            </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Drikkevindu</CardTitle>
-            {!isEditingDrinkingWindow && (
-              <Button variant="outline" size="sm" onClick={() => setIsEditingDrinkingWindow(true)}>
-                {wine.drink_after_date || wine.drink_before_date ? 'Rediger' : 'Legg til'}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isEditingDrinkingWindow ? (
-            <div className="space-y-4">
+        {isEditingOm ? (
+          <div className="space-y-4">
+            <div className="wine-fields">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Drikk etter</label>
-                <Input
-                  type="date"
-                  value={drinkAfterDate}
-                  onChange={(e) => setDrinkAfterDate(e.target.value)}
-                  className="w-full"
-                />
+                <label className="wine-field__label">Navn</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Drikk før</label>
+                <label className="wine-field__label">Produsent</label>
+                <Input value={producer} onChange={(e) => setProducer(e.target.value)} />
+              </div>
+              <div>
+                <label className="wine-field__label">Årgang</label>
+                <Input type="number" value={vintage} onChange={(e) => setVintage(e.target.value)} />
+              </div>
+              <div>
+                <label className="wine-field__label">Type</label>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  className="field-control w-full"
+                >
+                  <option value="">Velg type</option>
+                  <option value="Red">Rød</option>
+                  <option value="White">Hvit</option>
+                  <option value="Rose">Rosé</option>
+                  <option value="Sparkling">Musserende</option>
+                  <option value="Dessert">Dessert</option>
+                  <option value="Fortified">Sterkvin</option>
+                </select>
+              </div>
+              <div>
+                <label className="wine-field__label">Kjøpspris</label>
                 <Input
-                  type="date"
-                  value={drinkBeforeDate}
-                  onChange={(e) => setDrinkBeforeDate(e.target.value)}
-                  className="w-full"
+                  type="number"
+                  step="0.01"
+                  value={purchasePrice}
+                  onChange={(e) => setPurchasePrice(e.target.value)}
+                  placeholder="0.00"
                 />
               </div>
-              <div className="flex gap-2">
-                <Button onClick={handleSaveDrinkingWindow} disabled={isSaving}>
-                  {isSaving ? 'Lagrer…' : 'Lagre'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setDrinkAfterDate(wine.drink_after_date || '')
-                    setDrinkBeforeDate(wine.drink_before_date || '')
-                    setIsEditingDrinkingWindow(false)
-                  }}
-                  disabled={isSaving}
-                >
-                  Avbryt
-                </Button>
-              </div>
             </div>
-          ) : (
-            <div>
-              <span className="text-sm font-medium text-gray-600">Anbefalt periode</span>
-              <p className="text-base">{formatDrinkingWindow(wine.drink_after_date, wine.drink_before_date)}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Druer</CardTitle>
-            {!isEditingDruer && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const existing = (wine.grape_composition || []).map((g) => ({
-                    grape_variety: g.grape_variety,
-                    percentage: g.percentage,
-                  }))
-                  setGrapes(existing.length ? existing : [{ grape_variety: '', percentage: 0 }])
-                  setGrapeFormKey((k) => k + 1)
-                  setIsEditingDruer(true)
-                }}
-              >
-                {wine.grape_composition?.length ? 'Rediger' : 'Legg til'}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isEditingDruer ? (
-            <div className="space-y-4">
-              <GrapeCompositionInput
-                key={`grapes-${grapeFormKey}`}
-                value={grapes}
-                onChange={setGrapes}
-                disabled={isSaving}
-              />
-              <div className="flex gap-2">
-                <Button onClick={handleSaveDruer} disabled={isSaving}>
-                  {isSaving ? 'Lagrer…' : 'Lagre'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setGrapes(
-                      (wine.grape_composition || []).map((g) => ({
-                        grape_variety: g.grape_variety,
-                        percentage: g.percentage,
-                      }))
-                    )
-                    setIsEditingDruer(false)
-                  }}
-                  disabled={isSaving}
-                >
-                  Avbryt
-                </Button>
+            <div className="wine-fields wine-fields--3">
+              <div>
+                <label className="wine-field__label">Land</label>
+                <Input value={country} onChange={(e) => setCountry(e.target.value)} />
+              </div>
+              <div>
+                <label className="wine-field__label">Distrikt</label>
+                <Input value={district} onChange={(e) => setDistrict(e.target.value)} />
+              </div>
+              <div>
+                <label className="wine-field__label">Underdistrikt</label>
+                <Input value={subdistrict} onChange={(e) => setSubdistrict(e.target.value)} />
               </div>
             </div>
-          ) : wine.grape_composition && wine.grape_composition.length > 0 ? (
+
             <div className="space-y-2">
-              {wine.grape_composition.map((gc) => (
-                <div key={gc.id} className="flex items-center justify-between">
-                  <span>{gc.grape_variety}</span>
-                  <span className="text-gray-600">{gc.percentage}%</span>
-                </div>
-              ))}
+              <span className="wine-field__label">Etikettbilde</span>
+              <div className="flex flex-wrap items-start gap-3">
+                {labelPreview ? (
+                  <img
+                    src={labelPreview}
+                    alt="Nytt etikettbilde"
+                    className="entity-row__thumb entity-row__thumb--lg"
+                  />
+                ) : (
+                  <WineLabelThumb
+                    key={`edit-thumb-${labelThumbKey}`}
+                    wineId={wine.id}
+                    enabled={Boolean(wine.has_label_image)}
+                    alt={`Etikett for ${wine.name}`}
+                    className="entity-row__thumb--lg"
+                    onOpen={wine.has_label_image ? () => setLightboxOpen(true) : undefined}
+                  />
+                )}
+                <label className="btn btn--ghost btn--small cursor-pointer">
+                  {wine.has_label_image || labelImage ? 'Bytt bilde' : 'Legg til bilde'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => onLabelFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </div>
             </div>
-          ) : (
-            <div className="text-gray-500 italic">Ingen druer registrert</div>
+
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn btn--primary" onClick={handleSaveOm} disabled={isSaving}>
+                {isSaving ? 'Lagrer…' : 'Lagre'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  resetOmFields()
+                  setIsEditingOm(false)
+                }}
+                disabled={isSaving}
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="wine-fields">
+              <div>
+                <span className="wine-field__label">Navn</span>
+                <p className="wine-field__value">{wine.name}</p>
+              </div>
+              <div>
+                <span className="wine-field__label">Produsent</span>
+                <p className="wine-field__value">{wine.producer || '—'}</p>
+              </div>
+              <div>
+                <span className="wine-field__label">Årgang</span>
+                <p className="wine-field__value">{wine.vintage ?? '—'}</p>
+              </div>
+              <div>
+                <span className="wine-field__label">Type</span>
+                <p className="wine-field__value">{wine.type || '—'}</p>
+              </div>
+              <div>
+                <span className="wine-field__label">Kjøpspris</span>
+                <p className="wine-field__value">{formatPrice(wine.purchase_price)}</p>
+              </div>
+            </div>
+            <div className="wine-fields wine-fields--3">
+              <div>
+                <span className="wine-field__label">Land</span>
+                <p className="wine-field__value">{wine.country || '—'}</p>
+              </div>
+              <div>
+                <span className="wine-field__label">Distrikt</span>
+                <p className="wine-field__value">{wine.district || '—'}</p>
+              </div>
+              <div>
+                <span className="wine-field__label">Underdistrikt</span>
+                <p className="wine-field__value">{wine.subdistrict || '—'}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="wine-block">
+        <div className="wine-block__head">
+          <h2>Drikkevindu</h2>
+          {!isEditingDrinkingWindow && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={() => setIsEditingDrinkingWindow(true)}
+            >
+              {wine.drink_after_date || wine.drink_before_date ? 'Rediger' : 'Legg til'}
+            </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+        {isEditingDrinkingWindow ? (
+          <div className="space-y-4">
+            <div className="wine-fields">
+              <div>
+                <label className="wine-field__label">Drikk etter</label>
+                <Input type="date" value={drinkAfterDate} onChange={(e) => setDrinkAfterDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="wine-field__label">Drikk før</label>
+                <Input type="date" value={drinkBeforeDate} onChange={(e) => setDrinkBeforeDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn btn--primary" onClick={handleSaveDrinkingWindow} disabled={isSaving}>
+                {isSaving ? 'Lagrer…' : 'Lagre'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  setDrinkAfterDate(wine.drink_after_date || '')
+                  setDrinkBeforeDate(wine.drink_before_date || '')
+                  setIsEditingDrinkingWindow(false)
+                }}
+                disabled={isSaving}
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <span className="wine-field__label">Anbefalt periode</span>
+            <p className="wine-field__value">{formatDrinkingWindow(wine.drink_after_date, wine.drink_before_date)}</p>
+          </div>
+        )}
+      </section>
+
+      <section className="wine-block">
+        <div className="wine-block__head">
+          <h2>Druer</h2>
+          {!isEditingDruer && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={() => {
+                const existing = (wine.grape_composition || []).map((g) => ({
+                  grape_variety: g.grape_variety,
+                  percentage: g.percentage,
+                }))
+                setGrapes(existing.length ? existing : [{ grape_variety: '', percentage: 0 }])
+                setGrapeFormKey((k) => k + 1)
+                setIsEditingDruer(true)
+              }}
+            >
+              {wine.grape_composition?.length ? 'Rediger' : 'Legg til'}
+            </button>
+          )}
+        </div>
+        {isEditingDruer ? (
+          <div className="space-y-4">
+            <GrapeCompositionInput
+              key={`grapes-${grapeFormKey}`}
+              value={grapes}
+              onChange={setGrapes}
+              disabled={isSaving}
+              showHeading={false}
+            />
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn btn--primary" onClick={handleSaveDruer} disabled={isSaving}>
+                {isSaving ? 'Lagrer…' : 'Lagre'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  setGrapes(
+                    (wine.grape_composition || []).map((g) => ({
+                      grape_variety: g.grape_variety,
+                      percentage: g.percentage,
+                    }))
+                  )
+                  setIsEditingDruer(false)
+                }}
+                disabled={isSaving}
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        ) : wine.grape_composition && wine.grape_composition.length > 0 ? (
+          <div>
+            {wine.grape_composition.map((gc) => (
+              <div key={gc.id} className="wine-grape-row">
+                <span>{gc.grape_variety}</span>
+                <span className="wine-grape-row__pct">{gc.percentage}%</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state" style={{ padding: 0 }}>
+            Ingen druer registrert
+          </p>
+        )}
+      </section>
 
       {showInventoryTracking && (
-        <InventoryTrackingSystemView
-          wineId={wine.id}
-          initialQuantity={wine.quantity ?? 0}
-          onQuantityUpdate={onQuantityUpdate}
-        />
+        <section className="wine-block">
+          <div className="wine-block__head">
+            <h2>Beholdning</h2>
+          </div>
+          <InventoryTrackingSystemView
+            wineId={wine.id}
+            initialQuantity={wine.quantity ?? 0}
+            onQuantityUpdate={onQuantityUpdate}
+          />
+        </section>
       )}
     </div>
   )
