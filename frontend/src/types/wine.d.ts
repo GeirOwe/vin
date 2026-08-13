@@ -30,6 +30,9 @@ export interface WineListItem {
   vintage?: number | null
   type?: string | null
   quantity?: number | null
+  purchase_price?: number | null
+  drink_after_date?: string | null
+  drink_before_date?: string | null
   grape_composition: Grape[]
   has_label_image?: boolean
 }

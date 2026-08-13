@@ -41,6 +41,7 @@ def apply_wine_filters(
     district: Optional[str] = None,
     subdistrict: Optional[str] = None,
     drinking_window_status: Optional[str] = None,
+    grape: Optional[str] = None,
 ) -> Select:
     """
     Apply common filters to a Wine query.
@@ -58,6 +59,7 @@ def apply_wine_filters(
             - "approaching_deadline": Wines that should be consumed within 30 days
             - "not_ready": Wines not yet ready to drink
             Note: All drinking window status filters exclude wines with zero quantity
+        grape: Filter by grape variety (case-insensitive exact match)
         
     Returns:
         Select statement with filters applied
@@ -76,10 +78,15 @@ def apply_wine_filters(
         stmt = stmt.filter(Wine.country == country)
     
     if district:
-        stmt = stmt.filter(Wine.district == district)
+        stmt = stmt.filter(Wine.district.ilike(district))
     
     if subdistrict:
         stmt = stmt.filter(Wine.subdistrict == subdistrict)
+
+    if grape:
+        stmt = stmt.filter(
+            Wine.grape_compositions.any(GrapeComposition.grape_variety.ilike(grape))
+        )
     
     # Drinking window status filtering
     if drinking_window_status:
@@ -128,7 +135,7 @@ def apply_sorting(
     
     Args:
         stmt: Select statement to sort
-        sort_by: Field to sort by (id, name, producer, vintage, type)
+        sort_by: Field to sort by (id, name, producer, vintage, type, purchase_price, drink_after_date, drink_before_date)
         sort_order: Sort order (asc or desc)
         
     Returns:
@@ -143,6 +150,9 @@ def apply_sorting(
         "producer": Wine.producer,
         "vintage": Wine.vintage,
         "type": Wine.type,
+        "purchase_price": Wine.purchase_price,
+        "drink_after_date": Wine.drink_after_date,
+        "drink_before_date": Wine.drink_before_date,
     }
     
     if sort_by not in sort_fields:
@@ -151,9 +161,9 @@ def apply_sorting(
     sort_field = sort_fields[sort_by]
     
     if sort_order == "desc":
-        return stmt.order_by(sort_field.desc())
+        return stmt.order_by(sort_field.desc().nulls_last(), Wine.id.desc())
     else:
-        return stmt.order_by(sort_field.asc())
+        return stmt.order_by(sort_field.asc().nulls_last(), Wine.id.desc())
 
 
 def apply_pagination(
@@ -184,6 +194,7 @@ def build_wine_count_query(
     district: Optional[str] = None,
     subdistrict: Optional[str] = None,
     drinking_window_status: Optional[str] = None,
+    grape: Optional[str] = None,
 ) -> Select:
     """
     Build a count query for wines with filters applied.
@@ -196,6 +207,7 @@ def build_wine_count_query(
         district: Filter by district
         subdistrict: Filter by subdistrict
         drinking_window_status: Filter by drinking window status
+        grape: Filter by grape variety
         
     Returns:
         Select statement for counting wines
@@ -210,5 +222,6 @@ def build_wine_count_query(
         district=district,
         subdistrict=subdistrict,
         drinking_window_status=drinking_window_status,
+        grape=grape,
     )
 

@@ -624,6 +624,25 @@ body,
     color: var(--ink-soft);
   }
 
+  .entity-row__facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.9rem;
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--muted-text);
+  }
+
+  .entity-row__facts em {
+    font-style: normal;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    margin-right: 0.3rem;
+    color: var(--ink-soft);
+  }
+
   .entity-row__stats {
     display: flex;
     align-items: center;
@@ -631,6 +650,14 @@ body,
     flex-shrink: 0;
     font-size: 0.85rem;
     color: var(--muted-text);
+  }
+
+  .toolbar__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
   }
 
   .entity-row__chevron {
@@ -647,6 +674,15 @@ body,
     gap: 0.65rem;
     align-items: center;
     margin-bottom: 1.25rem;
+  }
+
+  .toolbar--filters {
+    align-items: stretch;
+  }
+
+  .toolbar__search {
+    flex: 1 1 14rem;
+    min-width: 12rem;
   }
 
   .field-control {

@@ -190,7 +190,14 @@ class WineFilterParameters(BaseModel):
     country: Optional[str] = None
     district: Optional[str] = None
     subdistrict: Optional[str] = None
+    grape: Optional[str] = None
     drinking_window_status: Optional[Literal["ready_to_drink", "approaching_deadline", "not_ready"]] = None
+
+
+class WineFilterOptionsResponse(BaseModel):
+    types: List[str] = []
+    districts: List[str] = []
+    grapes: List[str] = []
 
 
 class PaginationParams(BaseModel):
@@ -199,7 +206,16 @@ class PaginationParams(BaseModel):
 
 
 class SortingParams(BaseModel):
-    sort_by: Literal["id", "name", "producer", "vintage", "type"] = "id"
+    sort_by: Literal[
+        "id",
+        "name",
+        "producer",
+        "vintage",
+        "type",
+        "purchase_price",
+        "drink_after_date",
+        "drink_before_date",
+    ] = "id"
     sort_order: Literal["asc", "desc"] = "desc"
 
 
@@ -210,6 +226,9 @@ class WineListItem(BaseModel):
     vintage: Optional[int]
     type: Optional["WineType"]
     quantity: Optional[int] = None
+    purchase_price: Optional[float] = None
+    drink_after_date: Optional[date] = None
+    drink_before_date: Optional[date] = None
     grape_composition: List[GrapeCompositionResponse] = []
     has_label_image: bool = False
 

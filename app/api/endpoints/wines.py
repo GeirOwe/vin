@@ -27,6 +27,7 @@ from ...schemas import (
     TastingNoteResponse,
     WineConsumptionResponse,
     LabelExtractionResponse,
+    WineFilterOptionsResponse,
 )
 from ...services.wine_api_service import fetch_drinking_window_suggestion, ExternalApiError, SupportedWineType
 from ...services.label_extraction_service import extract_wine_from_label_image, LabelExtractionError
@@ -99,7 +100,17 @@ def to_wine_response(wine: Wine) -> WineResponse:
     )
 
 
-def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType], vintage: Optional[int], country: Optional[str], district: Optional[str], subdistrict: Optional[str], drinking_window_status: Optional[str] = None):
+def apply_filters(
+    stmt,
+    search_term: Optional[str],
+    wine_type: Optional[WineType],
+    vintage: Optional[int],
+    country: Optional[str],
+    district: Optional[str],
+    subdistrict: Optional[str],
+    drinking_window_status: Optional[str] = None,
+    grape: Optional[str] = None,
+):
     if search_term:
         like = f"%{search_term}%"
         stmt = stmt.filter((Wine.name.ilike(like)) | (Wine.producer.ilike(like)))
@@ -110,15 +121,19 @@ def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType
     if country:
         stmt = stmt.filter(Wine.country == country)
     if district:
-        stmt = stmt.filter(Wine.district == district)
+        stmt = stmt.filter(Wine.district.ilike(district))
     if subdistrict:
         stmt = stmt.filter(Wine.subdistrict == subdistrict)
-    
+    if grape:
+        stmt = stmt.filter(
+            Wine.grape_compositions.any(GrapeComposition.grape_variety.ilike(grape))
+        )
+
     # Drinking window status filtering
     if drinking_window_status:
         from datetime import date, timedelta
         today = date.today()
-        
+
         if drinking_window_status == "ready_to_drink":
             # Wines where today is between drink_after_date and drink_before_date
             # Both dates must be present (not NULL) for a wine to be considered ready
@@ -144,12 +159,49 @@ def apply_filters(stmt, search_term: Optional[str], wine_type: Optional[WineType
                 Wine.drink_after_date.isnot(None),
                 Wine.drink_after_date > today
             )
-        
+
         # Exclude wines with zero quantity from drinking window status filters
         # Wines with zero quantity are no longer in the collection and shouldn't trigger alerts
         stmt = stmt.filter(Wine.quantity > 0)
-    
+
     return stmt
+
+
+@router.get("/filter-options", response_model=WineFilterOptionsResponse)
+def wine_filter_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> WineFilterOptionsResponse:
+    owned = Wine.user_id == current_user.id
+    in_stock = (Wine.quantity.isnot(None)) & (Wine.quantity > 0)
+
+    types = db.execute(
+        select(Wine.type)
+        .where(owned, in_stock, Wine.type.isnot(None), Wine.type != "")
+        .distinct()
+        .order_by(Wine.type)
+    ).scalars().all()
+
+    districts = db.execute(
+        select(Wine.district)
+        .where(owned, in_stock, Wine.district.isnot(None), Wine.district != "")
+        .distinct()
+        .order_by(Wine.district)
+    ).scalars().all()
+
+    grapes = db.execute(
+        select(GrapeComposition.grape_variety)
+        .join(Wine, GrapeComposition.wine_id == Wine.id)
+        .where(owned, in_stock, GrapeComposition.grape_variety != "")
+        .distinct()
+        .order_by(GrapeComposition.grape_variety)
+    ).scalars().all()
+
+    return WineFilterOptionsResponse(
+        types=[t for t in types if t],
+        districts=[d for d in districts if d],
+        grapes=[g for g in grapes if g],
+    )
 
 
 @router.get("", response_model=List[WineResponse])
@@ -162,6 +214,7 @@ def list_wines(
     country: Optional[str] = Query(None),
     district: Optional[str] = Query(None),
     subdistrict: Optional[str] = Query(None),
+    grape: Optional[str] = Query(None),
     drinking_window_status: Optional[str] = Query(None),
     quantity_filter: Optional[str] = Query("non_zero", pattern="^(non_zero|zero|all)$"),
 ) -> List[WineResponse]:
@@ -172,7 +225,9 @@ def list_wines(
             .where(Wine.user_id == current_user.id)
             .order_by(Wine.id.desc())
         )
-        stmt = apply_filters(stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
+        stmt = apply_filters(
+            stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status, grape
+        )
         
         # Apply quantity filter (default: exclude zero quantity wines)
         if quantity_filter == "non_zero":
@@ -193,7 +248,10 @@ def list_wines_page(
     current_user: User = Depends(get_current_user),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
-    sort_by: str = Query("id", pattern="^(id|name|producer|vintage|type)$"),
+    sort_by: str = Query(
+        "id",
+        pattern="^(id|name|producer|vintage|type|purchase_price|drink_after_date|drink_before_date)$",
+    ),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     search_term: Optional[str] = Query(None),
     wine_type: Optional[WineType] = Query(None),
@@ -201,6 +259,7 @@ def list_wines_page(
     country: Optional[str] = Query(None),
     district: Optional[str] = Query(None),
     subdistrict: Optional[str] = Query(None),
+    grape: Optional[str] = Query(None),
     drinking_window_status: Optional[str] = Query(None),
     quantity_filter: Optional[str] = Query("non_zero", pattern="^(non_zero|zero|all)$"),
 ) -> WineListPageResponse:
@@ -211,7 +270,9 @@ def list_wines_page(
             .options(selectinload(Wine.grape_compositions))
             .where(Wine.user_id == current_user.id)
         )
-        base_stmt = apply_filters(base_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
+        base_stmt = apply_filters(
+            base_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status, grape
+        )
         
         # Apply quantity filter (default: exclude zero quantity wines)
         # Note: If drinking_window_status is set, quantity > 0 is already applied in apply_filters
@@ -226,22 +287,27 @@ def list_wines_page(
             # This allows viewing wines with zero quantity even in drinking window views (though unusual)
             pass
 
-        # Sorting
+        # Sorting (nulls last so incomplete rows don't float to the top)
         sort_field = {
             "id": Wine.id,
             "name": Wine.name,
             "producer": Wine.producer,
             "vintage": Wine.vintage,
             "type": Wine.type,
+            "purchase_price": Wine.purchase_price,
+            "drink_after_date": Wine.drink_after_date,
+            "drink_before_date": Wine.drink_before_date,
         }[sort_by]
         if sort_order == "desc":
-            base_stmt = base_stmt.order_by(sort_field.desc())
+            base_stmt = base_stmt.order_by(sort_field.desc().nulls_last(), Wine.id.desc())
         else:
-            base_stmt = base_stmt.order_by(sort_field.asc())
+            base_stmt = base_stmt.order_by(sort_field.asc().nulls_last(), Wine.id.desc())
 
         # Count total AFTER filters (including quantity filter)
         count_stmt = select(func.count(Wine.id))
-        count_stmt = apply_filters(count_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status)
+        count_stmt = apply_filters(
+            count_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status, grape
+        )
         # Apply quantity filter consistently with main query
         if not drinking_window_status:
             if quantity_filter == "non_zero":
@@ -266,6 +332,9 @@ def list_wines_page(
                 vintage=w.vintage,
                 type=w.type,
                 quantity=w.quantity,
+                purchase_price=w.purchase_price,
+                drink_after_date=w.drink_after_date,
+                drink_before_date=w.drink_before_date,
                 grape_composition=[
                     GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
                     for gc in (w.grape_compositions or [])
