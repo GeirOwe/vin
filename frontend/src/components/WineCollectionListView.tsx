@@ -12,7 +12,7 @@ interface PaginatedResponse<T> {
   total_pages: number
 }
 
-type SortBy = 'purchase_price' | 'drink_after_date' | 'drink_before_date'
+type SortBy = 'name' | 'purchase_price' | 'drink_after_date' | 'drink_before_date'
 
 type SortOrder = 'asc' | 'desc'
 
@@ -214,6 +214,7 @@ export default function WineCollectionListView({
           <label className="toolbar__label">
             Sorter
             <select className="field-control" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
+              <option value="name">Navn</option>
               <option value="purchase_price">Kjøpspris</option>
               <option value="drink_after_date">Drikke etter</option>
               <option value="drink_before_date">Drikke før</option>
@@ -233,6 +234,8 @@ export default function WineCollectionListView({
                 setWineType('')
                 setGrape('')
                 setDistrict('')
+                setSortBy('name')
+                setSortOrder('asc')
               }}
             >
               Nullstill
