@@ -153,8 +153,6 @@ export default function WineCollectionListView({
     navigate(`/wines/${wineId}`)
   }
 
-  const hasActiveFilters = Boolean(debouncedSearch || wineType || grape || district)
-
   return (
     <div className="section">
       {showSearchAndSort && (
@@ -224,23 +222,21 @@ export default function WineCollectionListView({
             <option value="asc">Stigende</option>
             <option value="desc">Synkende</option>
           </select>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className="btn btn--ghost btn--small"
-              onClick={() => {
-                setSearchTerm('')
-                setDebouncedSearch('')
-                setWineType('')
-                setGrape('')
-                setDistrict('')
-                setSortBy('name')
-                setSortOrder('asc')
-              }}
-            >
-              Nullstill
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn--ghost btn--small"
+            onClick={() => {
+              setSearchTerm('')
+              setDebouncedSearch('')
+              setWineType('')
+              setGrape('')
+              setDistrict('')
+              setSortBy('name')
+              setSortOrder('asc')
+            }}
+          >
+            Nullstill
+          </button>
         </div>
       )}
 
