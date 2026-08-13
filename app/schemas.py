@@ -105,6 +105,8 @@ class WineUpdateRequest(BaseModel):
     quantity: Optional[int] = Field(default=None, ge=0)
     drink_after_date: Optional[date] = None
     drink_before_date: Optional[date] = None
+    taste_dice: Optional[int] = Field(default=None, ge=1, le=6)
+    taste_verdict: Optional[TasteVerdict] = None
     grape_composition: Optional[List[GrapeCompositionSchema]] = None
     label_image_base64: Optional[str] = None
     label_image_content_type: Optional[str] = Field(default=None, max_length=100)
@@ -143,6 +145,8 @@ class WineResponse(BaseModel):
     quantity: Optional[int]
     drink_after_date: Optional[date]
     drink_before_date: Optional[date]
+    taste_dice: Optional[int] = None
+    taste_verdict: Optional[TasteVerdict] = None
     grape_composition: List[GrapeCompositionResponse] = []
     has_label_image: bool = False
 
@@ -181,6 +185,14 @@ class WineType(str, Enum):
     Sparkling = "Sparkling"
     Dessert = "Dessert"
     Fortified = "Fortified"
+
+
+class TasteVerdict(str, Enum):
+    mye_vin_for_pengene = "mye_vin_for_pengene"
+    god_men_for_dyr = "god_men_for_dyr"
+    styr_unna = "styr_unna"
+    fantastisk = "fantastisk"
+    grei_nok = "grei_nok"
 
 
 class WineFilterParameters(BaseModel):
@@ -229,6 +241,8 @@ class WineListItem(BaseModel):
     purchase_price: Optional[float] = None
     drink_after_date: Optional[date] = None
     drink_before_date: Optional[date] = None
+    taste_dice: Optional[int] = None
+    taste_verdict: Optional[TasteVerdict] = None
     grape_composition: List[GrapeCompositionResponse] = []
     has_label_image: bool = False
 

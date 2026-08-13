@@ -643,6 +643,90 @@ body,
     color: var(--ink-soft);
   }
 
+  .entity-row__taste {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.75rem;
+    margin-top: 0.4rem;
+  }
+
+  .entity-row__dice {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    color: var(--brand-accent);
+  }
+
+  .entity-row__verdict {
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+  }
+
+  .taste-dice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+  }
+
+  .taste-dice__btn {
+    width: 2.4rem;
+    height: 2.4rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    color: var(--ink);
+    cursor: pointer;
+    transition:
+      background 0.2s var(--ease),
+      border-color 0.2s var(--ease),
+      color 0.2s var(--ease);
+  }
+
+  .taste-dice__btn:hover {
+    border-color: var(--brand-accent);
+  }
+
+  .taste-dice__btn.is-active {
+    background: var(--brand-accent);
+    border-color: var(--brand-accent);
+    color: #f7f6f2;
+  }
+
+  .taste-verdicts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.35rem;
+  }
+
+  .taste-verdict {
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 0.45rem 0.75rem;
+    font-size: 0.88rem;
+    color: var(--ink);
+    cursor: pointer;
+    text-align: left;
+    transition:
+      background 0.2s var(--ease),
+      border-color 0.2s var(--ease);
+  }
+
+  .taste-verdict:hover {
+    border-color: var(--brand-accent);
+  }
+
+  .taste-verdict.is-active {
+    background: var(--brand-accent-soft);
+    border-color: var(--brand-accent);
+    color: var(--brand-accent);
+  }
+
   .entity-row__stats {
     display: flex;
     align-items: center;

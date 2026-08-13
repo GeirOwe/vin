@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { WineLabelLightbox, WineLabelThumb } from './WineLabelThumb'
+import { formatTasteDice, tasteVerdictLabel } from '../lib/taste'
 
 type WineCardProps = {
   wine: {
@@ -11,6 +12,8 @@ type WineCardProps = {
     purchase_price?: number | null
     drink_after_date?: string | null
     drink_before_date?: string | null
+    taste_dice?: number | null
+    taste_verdict?: string | null
     has_label_image?: boolean
   }
   onClick?: (id: number) => void
@@ -39,6 +42,7 @@ function formatDate(value?: string | null): string {
 export default function WineEntryDisplayCard({ wine, onClick }: WineCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const meta = [wine.producer, wine.vintage].filter(Boolean).join(' · ') || '—'
+  const hasTaste = wine.taste_dice != null || Boolean(wine.taste_verdict)
 
   return (
     <>
@@ -78,6 +82,18 @@ export default function WineEntryDisplayCard({ wine, onClick }: WineCardProps) {
               <em>Før</em> {formatDate(wine.drink_before_date)}
             </span>
           </div>
+          {hasTaste && (
+            <div className="entity-row__taste">
+              {wine.taste_dice != null && (
+                <span className="entity-row__dice" title="Terningkast">
+                  {formatTasteDice(wine.taste_dice)}
+                </span>
+              )}
+              {wine.taste_verdict && (
+                <span className="entity-row__verdict">{tasteVerdictLabel(wine.taste_verdict)}</span>
+              )}
+            </div>
+          )}
         </div>
         <div className="entity-row__stats">
           <span>{wine.quantity ?? 0} flasker</span>

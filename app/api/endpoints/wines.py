@@ -92,6 +92,8 @@ def to_wine_response(wine: Wine) -> WineResponse:
         quantity=wine.quantity,
         drink_after_date=wine.drink_after_date,
         drink_before_date=wine.drink_before_date,
+        taste_dice=wine.taste_dice,
+        taste_verdict=wine.taste_verdict,
         grape_composition=[
             GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
             for gc in (wine.grape_compositions or [])
@@ -335,6 +337,8 @@ def list_wines_page(
                 purchase_price=w.purchase_price,
                 drink_after_date=w.drink_after_date,
                 drink_before_date=w.drink_before_date,
+                taste_dice=w.taste_dice,
+                taste_verdict=w.taste_verdict,
                 grape_composition=[
                     GrapeCompositionResponse(id=gc.id, grape_variety=gc.grape_variety, percentage=gc.percentage)
                     for gc in (w.grape_compositions or [])
@@ -381,6 +385,8 @@ def update_wine(
         update_data.pop("label_image_content_type", None)
 
         for field, value in update_data.items():
+            if field == "taste_verdict" and value is not None and hasattr(value, "value"):
+                value = value.value
             setattr(wine, field, value)
 
         if "label_image_base64" in payload.model_fields_set and payload.label_image_base64:

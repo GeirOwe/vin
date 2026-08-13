@@ -19,6 +19,8 @@ export interface Wine {
   quantity?: number | null
   drink_after_date?: string | null
   drink_before_date?: string | null
+  taste_dice?: number | null
+  taste_verdict?: string | null
   grape_composition: Grape[]
   has_label_image?: boolean
 }
@@ -33,6 +35,8 @@ export interface WineListItem {
   purchase_price?: number | null
   drink_after_date?: string | null
   drink_before_date?: string | null
+  taste_dice?: number | null
+  taste_verdict?: string | null
   grape_composition: Grape[]
   has_label_image?: boolean
 }

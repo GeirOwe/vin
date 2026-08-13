@@ -53,5 +53,7 @@ def ensure_schema() -> None:
     blob_type = "BYTEA" if engine.dialect.name == "postgresql" else "BLOB"
     _add_column_if_missing("wines", "label_image", blob_type)
     _add_column_if_missing("wines", "label_image_content_type", "VARCHAR(100)")
+    _add_column_if_missing("wines", "taste_dice", "INTEGER")
+    _add_column_if_missing("wines", "taste_verdict", "VARCHAR(50)")
 
     logger.info("Database schema ready")

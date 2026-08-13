@@ -74,6 +74,10 @@ class Wine(Base):
             "(drink_after_date IS NULL OR drink_before_date IS NULL) OR (drink_after_date < drink_before_date)",
             name="ck_wines_drinking_window_order",
         ),
+        CheckConstraint(
+            "taste_dice IS NULL OR (taste_dice >= 1 AND taste_dice <= 6)",
+            name="ck_wines_taste_dice_range",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -89,6 +93,8 @@ class Wine(Base):
     quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     drink_after_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     drink_before_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    taste_dice: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    taste_verdict: Mapped[str | None] = mapped_column(String(50), nullable=True)
     label_image: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     label_image_content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
 

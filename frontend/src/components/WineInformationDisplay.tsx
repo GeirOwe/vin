@@ -5,6 +5,7 @@ import { useApi } from '../hooks/useApi'
 import InventoryTrackingSystemView from './InventoryTrackingSystemView'
 import { GrapeCompositionInput, type GrapeComposition } from './GrapeCompositionInput'
 import { WineLabelLightbox, WineLabelThumb } from './WineLabelThumb'
+import { TASTE_VERDICTS, formatTasteDice, tasteVerdictLabel, type TasteVerdict } from '../lib/taste'
 
 interface WineInformationDisplayProps {
   wine: Wine
@@ -49,6 +50,7 @@ export default function WineInformationDisplay({
   const [isEditingOm, setIsEditingOm] = useState(false)
   const [isEditingDruer, setIsEditingDruer] = useState(false)
   const [isEditingDrinkingWindow, setIsEditingDrinkingWindow] = useState(false)
+  const [isEditingVurdering, setIsEditingVurdering] = useState(false)
 
   const [name, setName] = useState(wine.name)
   const [producer, setProducer] = useState(wine.producer || '')
@@ -64,6 +66,11 @@ export default function WineInformationDisplay({
 
   const [drinkAfterDate, setDrinkAfterDate] = useState(wine.drink_after_date || '')
   const [drinkBeforeDate, setDrinkBeforeDate] = useState(wine.drink_before_date || '')
+
+  const [tasteDice, setTasteDice] = useState<number | null>(wine.taste_dice ?? null)
+  const [tasteVerdict, setTasteVerdict] = useState<TasteVerdict | ''>(
+    (wine.taste_verdict as TasteVerdict) || ''
+  )
 
   const [grapes, setGrapes] = useState<GrapeComposition[]>(
     (wine.grape_composition || []).map((g) => ({
@@ -90,6 +97,8 @@ export default function WineInformationDisplay({
     setPurchasePrice(wine.purchase_price?.toString() || '')
     setDrinkAfterDate(wine.drink_after_date || '')
     setDrinkBeforeDate(wine.drink_before_date || '')
+    setTasteDice(wine.taste_dice ?? null)
+    setTasteVerdict((wine.taste_verdict as TasteVerdict) || '')
     setGrapes(
       (wine.grape_composition || []).map((g) => ({
         grape_variety: g.grape_variety,
@@ -215,6 +224,28 @@ export default function WineInformationDisplay({
     } catch (error) {
       console.error('Failed to update drinking window:', error)
       setSaveError('Kunne ikke lagre drikkevindu')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveVurdering = async () => {
+    setIsSaving(true)
+    setSaveError(null)
+    try {
+      const result = await patchJson(`/api/wines/${wine.id}`, {
+        taste_dice: tasteDice,
+        taste_verdict: tasteVerdict || null,
+      })
+      if (!result) {
+        setSaveError('Kunne ikke lagre vurderingen')
+        return
+      }
+      setIsEditingVurdering(false)
+      onWineUpdate?.()
+    } catch (error) {
+      console.error('Failed to update taste assessment:', error)
+      setSaveError('Kunne ikke lagre vurderingen')
     } finally {
       setIsSaving(false)
     }
@@ -548,6 +579,113 @@ export default function WineInformationDisplay({
         ) : (
           <p className="empty-state" style={{ padding: 0 }}>
             Ingen druer registrert
+          </p>
+        )}
+      </section>
+
+      <section className="wine-block">
+        <div className="wine-block__head">
+          <h2>Vurdering</h2>
+          {!isEditingVurdering && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={() => {
+                setTasteDice(wine.taste_dice ?? null)
+                setTasteVerdict((wine.taste_verdict as TasteVerdict) || '')
+                setIsEditingVurdering(true)
+              }}
+            >
+              {wine.taste_dice != null || wine.taste_verdict ? 'Rediger' : 'Legg til'}
+            </button>
+          )}
+        </div>
+        {isEditingVurdering ? (
+          <div className="space-y-4">
+            <div>
+              <span className="wine-field__label">Terningkast</span>
+              <div className="taste-dice" role="group" aria-label="Terningkast">
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`taste-dice__btn ${tasteDice === n ? 'is-active' : ''}`}
+                    onClick={() => setTasteDice(n)}
+                    disabled={isSaving}
+                  >
+                    {n}
+                  </button>
+                ))}
+                {tasteDice != null && (
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--small"
+                    onClick={() => setTasteDice(null)}
+                    disabled={isSaving}
+                  >
+                    Fjern
+                  </button>
+                )}
+              </div>
+            </div>
+            <div>
+              <span className="wine-field__label">Konklusjon</span>
+              <div className="taste-verdicts" role="group" aria-label="Smaksvurdering">
+                {TASTE_VERDICTS.map((v) => (
+                  <button
+                    key={v.value}
+                    type="button"
+                    className={`taste-verdict ${tasteVerdict === v.value ? 'is-active' : ''}`}
+                    onClick={() => setTasteVerdict(v.value)}
+                    disabled={isSaving}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+              {tasteVerdict && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--small mt-2"
+                  onClick={() => setTasteVerdict('')}
+                  disabled={isSaving}
+                >
+                  Fjern konklusjon
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn btn--primary" onClick={handleSaveVurdering} disabled={isSaving}>
+                {isSaving ? 'Lagrer…' : 'Lagre'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => {
+                  setTasteDice(wine.taste_dice ?? null)
+                  setTasteVerdict((wine.taste_verdict as TasteVerdict) || '')
+                  setIsEditingVurdering(false)
+                }}
+                disabled={isSaving}
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        ) : wine.taste_dice != null || wine.taste_verdict ? (
+          <div className="wine-fields">
+            <div>
+              <span className="wine-field__label">Terningkast</span>
+              <p className="wine-field__value">{formatTasteDice(wine.taste_dice)}</p>
+            </div>
+            <div>
+              <span className="wine-field__label">Konklusjon</span>
+              <p className="wine-field__value">{tasteVerdictLabel(wine.taste_verdict)}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="empty-state" style={{ padding: 0 }}>
+            Ingen vurdering ennå
           </p>
         )}
       </section>
