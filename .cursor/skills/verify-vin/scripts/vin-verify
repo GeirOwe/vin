@@ -1,0 +1,542 @@
+#!/usr/bin/env bash
+# Launch, inspect, and tear down an isolated Vin verification instance.
+# Never touches the repo's vin.db or the default dev ports unless this run bound them.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
+PY="$ROOT/.venv/bin/python"
+VITE="$ROOT/frontend/node_modules/.bin/vite"
+RUNTIME_DIR="$SKILL_DIR/runtime"
+LATEST="$RUNTIME_DIR/latest"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  vin-verify launch
+  vin-verify doctor [--run RUN_ID]
+  vin-verify cleanup [--run RUN_ID]
+  vin-verify state [--run RUN_ID]
+
+launch   starts API + web UI on free ports, with a disposable SQLite file, and seeds a user and three wines.
+doctor   read-only check that this run is up, is the process we started, and can log in.
+cleanup  stops the pids recorded for this run and deletes the disposable data dir. Leaves artifacts/.
+state    prints the shell-sourceable state file.
+EOF
+}
+
+die() {
+  echo "vin-verify: $*" >&2
+  exit 1
+}
+
+run_id_from_args() {
+  local run_id=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --run)
+        [[ $# -ge 2 ]] || die "--run needs a RUN_ID"
+        run_id="$2"
+        shift 2
+        ;;
+      *)
+        die "unknown argument: $1"
+        ;;
+    esac
+  done
+  if [[ -z "$run_id" ]]; then
+    [[ -f "$LATEST" ]] || die "no run recorded. Pass --run RUN_ID or launch first."
+    run_id="$(tr -d '[:space:]' < "$LATEST")"
+  fi
+  printf '%s' "$run_id"
+}
+
+state_file_for() {
+  local run_id="$1"
+  local data_dir="/tmp/vin-verify-$run_id"
+  local state="$data_dir/state.env"
+  [[ -f "$state" ]] || die "state file missing: $state"
+  printf '%s' "$state"
+}
+
+load_state() {
+  local state="$1"
+  # shellcheck disable=SC1090
+  set -a
+  source "$state"
+  set +a
+  [[ -n "${RUN_ID:-}" && -n "${API_PID:-}" && -n "${WEB_PID:-}" ]] || die "state file is incomplete: $state"
+  [[ "$DATA_DIR" == /tmp/vin-verify-* ]] || die "refusing data dir outside /tmp/vin-verify-*: $DATA_DIR"
+  [[ "$DB_PATH" == "$DATA_DIR/vin.db" ]] || die "refusing database outside the run data dir: $DB_PATH"
+  case "$DB_PATH" in
+    "$ROOT"/*) die "refusing a database inside the repo: $DB_PATH" ;;
+  esac
+}
+
+pid_alive() {
+  local pid="$1"
+  kill -0 "$pid" 2>/dev/null
+}
+
+pid_command() {
+  local pid="$1"
+  ps -ww -p "$pid" -o command= 2>/dev/null || true
+}
+
+port_owner() {
+  local port="$1"
+  lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n 1 || true
+}
+
+free_port() {
+  "$PY" - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+}
+
+# Double-fork so the server survives this script exiting. Prints nothing.
+# Usage: daemonize PIDFILE LOGFILE CWD -- EXE ARG...
+daemonize() {
+  "$PY" - "$@" <<'PY'
+import os
+import sys
+
+args = sys.argv[1:]
+sep = args.index("--")
+pidfile, logfile, cwd = args[0], args[1], args[2]
+argv = args[sep + 1 :]
+pid = os.fork()
+if pid > 0:
+    os.waitpid(pid, 0)
+    raise SystemExit(0)
+os.setsid()
+pid2 = os.fork()
+if pid2 > 0:
+    with open(pidfile, "w", encoding="utf-8") as handle:
+        handle.write(str(pid2))
+    os._exit(0)
+os.chdir(cwd)
+fd = os.open(logfile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+os.dup2(fd, 1)
+os.dup2(fd, 2)
+os.execv(argv[0], argv)
+PY
+}
+
+wait_for_log() {
+  local file="$1"
+  local pattern="$2"
+  local tries="${3:-60}"
+  local i
+  for ((i = 0; i < tries; i++)); do
+    if [[ -f "$file" ]] && grep -q "$pattern" "$file"; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+cmd_launch() {
+  [[ $# -eq 0 ]] || die "launch takes no arguments"
+  [[ -x "$PY" ]] || die "missing $PY — create the venv and pip install -r requirements.txt"
+  [[ -x "$VITE" ]] || die "missing $VITE — run npm install in frontend/"
+
+  local run_id data_dir api_port web_port
+  run_id="$(date +%Y%m%d%H%M%S)-$$"
+  data_dir="/tmp/vin-verify-$run_id"
+  mkdir -p "$data_dir" "$SKILL_DIR/artifacts/$run_id" "$RUNTIME_DIR"
+
+  api_port="$(free_port)"
+  web_port="$(free_port)"
+  [[ "$api_port" != "$web_port" ]] || web_port="$(free_port)"
+
+  local db_path="$data_dir/vin.db"
+  local api_base="http://127.0.0.1:$api_port"
+  local web_base="http://127.0.0.1:$web_port"
+  local approaching_before not_ready_after not_ready_before
+  approaching_before="$("$PY" - <<'PY'
+from datetime import date, timedelta
+print((date.today() + timedelta(days=16)).isoformat())
+PY
+)"
+  not_ready_after="$("$PY" - <<'PY'
+from datetime import date, timedelta
+print((date.today() + timedelta(days=400)).isoformat())
+PY
+)"
+  not_ready_before="$("$PY" - <<'PY'
+from datetime import date, timedelta
+print((date.today() + timedelta(days=800)).isoformat())
+PY
+)"
+
+  write_state() {
+    local api_pid_value="${1:-}"
+    local web_pid_value="${2:-}"
+    cat > "$data_dir/state.env" <<EOF
+RUN_ID=$(printf '%q' "$run_id")
+DATA_DIR=$(printf '%q' "$data_dir")
+DB_PATH=$(printf '%q' "$db_path")
+API_PORT=$(printf '%q' "$api_port")
+WEB_PORT=$(printf '%q' "$web_port")
+API_BASE=$(printf '%q' "$api_base")
+WEB_BASE=$(printf '%q' "$web_base")
+API_PID=$(printf '%q' "$api_pid_value")
+WEB_PID=$(printf '%q' "$web_pid_value")
+VERIFY_BRUKER_ID=$(printf '%q' "verify")
+VERIFY_PASSWORD=$(printf '%q' "verify-pass")
+SEEDED_READY_WINE=$(printf '%q' "Barolo Riserva")
+SEEDED_READY_PRODUCER=$(printf '%q' "Gaja")
+SEEDED_APPROACHING_WINE=$(printf '%q' "Siste sjanse")
+SEEDED_NOT_READY_WINE=$(printf '%q' "Ung Riesling")
+SEEDED_NOT_READY_PRODUCER=$(printf '%q' "Dr. Loosen")
+SEEDED_READY_AFTER=$(printf '%q' "2020-01-01")
+SEEDED_READY_BEFORE=$(printf '%q' "2030-12-31")
+SEEDED_APPROACHING_BEFORE=$(printf '%q' "$approaching_before")
+SEEDED_NOT_READY_AFTER=$(printf '%q' "$not_ready_after")
+SEEDED_NOT_READY_BEFORE=$(printf '%q' "$not_ready_before")
+EOF
+  }
+
+  write_state
+
+  cleanup_failed() {
+    local api_pid web_pid
+    api_pid="$(cat "$data_dir/api.pid" 2>/dev/null || true)"
+    web_pid="$(cat "$data_dir/web.pid" 2>/dev/null || true)"
+    if [[ -n "$api_pid" ]]; then kill "$api_pid" 2>/dev/null || true; fi
+    if [[ -n "$web_pid" ]]; then kill "$web_pid" 2>/dev/null || true; fi
+    sleep 0.5
+    if [[ -n "$api_pid" ]]; then kill -9 "$api_pid" 2>/dev/null || true; fi
+    if [[ -n "$web_pid" ]]; then kill -9 "$web_pid" 2>/dev/null || true; fi
+    rm -rf "$data_dir"
+  }
+  launch_ok=0
+  cleanup_on_exit() {
+    if [[ "${launch_ok}" -eq 1 ]]; then
+      return 0
+    fi
+    cleanup_failed
+  }
+  trap cleanup_on_exit EXIT
+
+  DATABASE_URL="sqlite:///$db_path" \
+    CORS_ORIGINS="$web_base" \
+    ENVIRONMENT=verification \
+    daemonize "$data_dir/api.pid" "$data_dir/api.log" "$ROOT" -- \
+      "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$api_port"
+
+  BROWSER=none \
+    VITE_API_BASE="$api_base" \
+    daemonize "$data_dir/web.pid" "$data_dir/web.log" "$ROOT/frontend" -- \
+      "$VITE" --host 127.0.0.1 --port "$web_port" --strictPort
+
+  local api_pid web_pid
+  api_pid="$(cat "$data_dir/api.pid")"
+  web_pid="$(cat "$data_dir/web.pid")"
+
+  if ! wait_for_log "$data_dir/api.log" "Application startup complete" 60; then
+    echo "--- api.log ---" >&2
+    cat "$data_dir/api.log" >&2 || true
+    die "API did not finish startup"
+  fi
+  if ! wait_for_log "$data_dir/web.log" "Local:" 60; then
+    echo "--- web.log ---" >&2
+    cat "$data_dir/web.log" >&2 || true
+    die "web UI did not become ready"
+  fi
+
+  local health
+  health="$(curl -sf "$api_base/health")" || die "health check failed: $api_base/health"
+  "$PY" -c 'import json,sys; body=json.loads(sys.argv[1]); assert body.get("status")=="ok"; assert body.get("database",{}).get("status")=="ok"' "$health" \
+    || die "health is not usable: $health"
+
+  curl -sf "$web_base/" | grep -q 'id="root"' || die "web UI did not serve the Vin shell"
+
+  seed_instance "$api_base" "$approaching_before" "$not_ready_after" "$not_ready_before"
+
+  # Refresh pids after seed in case the shell wrappers were all we had.
+  api_pid="$(cat "$data_dir/api.pid")"
+  web_pid="$(cat "$data_dir/web.pid")"
+  pid_alive "$api_pid" || die "API pid $api_pid is not alive after seed"
+  pid_alive "$web_pid" || die "web pid $web_pid is not alive after seed"
+
+  write_state "$api_pid" "$web_pid"
+
+  printf '%s\n' "$run_id" > "$LATEST"
+  cp "$data_dir/state.env" "$SKILL_DIR/artifacts/$run_id/launch.env"
+  # The artifact copy is evidence. Drop the fixture password from the surviving copy.
+  grep -v '^VERIFY_PASSWORD=' "$data_dir/state.env" > "$SKILL_DIR/artifacts/$run_id/launch.env"
+
+  launch_ok=1
+  trap - EXIT
+  echo "RUN_ID=$run_id"
+  echo "WEB_BASE=$web_base"
+  echo "API_BASE=$api_base"
+  echo "STATE=$data_dir/state.env"
+  echo "EVIDENCE=$SKILL_DIR/artifacts/$run_id"
+  echo "SEEDED_APPROACHING_BEFORE=$approaching_before"
+  echo "SEEDED_NOT_READY_AFTER=$not_ready_after"
+}
+
+seed_instance() {
+  local api_base="$1"
+  local approaching_before="$2"
+  local not_ready_after="$3"
+  local not_ready_before="$4"
+  "$PY" - "$api_base" "$approaching_before" "$not_ready_after" "$not_ready_before" <<'PY'
+import json
+import sys
+import urllib.error
+import urllib.request
+
+api, approaching_before, not_ready_after, not_ready_before = sys.argv[1:5]
+
+def request(method, path, payload=None, token=None, expected=200):
+    data = None if payload is None else json.dumps(payload).encode()
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(api + path, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req) as res:
+            body = res.read().decode()
+            if res.status != expected:
+                raise SystemExit(f"seed {method} {path} -> {res.status}: {body}")
+            return json.loads(body) if body else {}
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode()
+        raise SystemExit(f"seed {method} {path} -> {exc.code}: {detail}")
+
+auth = request(
+    "POST",
+    "/api/auth/register",
+    {"bruker_id": "verify", "password": "verify-pass", "password_confirm": "verify-pass"},
+    expected=201,
+)
+token = auth["access_token"]
+wines = [
+    {
+        "name": "Barolo Riserva",
+        "type": "Red",
+        "producer": "Gaja",
+        "vintage": 2018,
+        "country": "Italia",
+        "district": "Piemonte",
+        "quantity": 6,
+        "purchase_price": 650,
+        "drink_after_date": "2020-01-01",
+        "drink_before_date": "2030-12-31",
+        "grape_composition": [{"grape_variety": "Nebbiolo", "percentage": 100}],
+    },
+    {
+        "name": "Siste sjanse",
+        "type": "Red",
+        "producer": "Clos des Papes",
+        "vintage": 2016,
+        "country": "Frankrike",
+        "district": "Rhone",
+        "quantity": 1,
+        "purchase_price": 280,
+        "drink_after_date": "2020-01-01",
+        "drink_before_date": approaching_before,
+        "grape_composition": [{"grape_variety": "Grenache", "percentage": 100}],
+    },
+    {
+        "name": "Ung Riesling",
+        "type": "White",
+        "producer": "Dr. Loosen",
+        "vintage": 2024,
+        "country": "Tyskland",
+        "district": "Mosel",
+        "quantity": 3,
+        "purchase_price": 220,
+        "drink_after_date": not_ready_after,
+        "drink_before_date": not_ready_before,
+        "grape_composition": [{"grape_variety": "Riesling", "percentage": 100}],
+    },
+]
+for wine in wines:
+    request("POST", "/api/wines", wine, token=token, expected=201)
+print("seeded verify / Barolo Riserva / Siste sjanse / Ung Riesling")
+PY
+}
+
+cmd_doctor() {
+  local run_id state
+  run_id="$(run_id_from_args "$@")"
+  state="$(state_file_for "$run_id")"
+  load_state "$state"
+
+  local fail=0
+  note() { echo "$*"; }
+  bad() { echo "FAIL: $*"; fail=1; }
+
+  note "RUN_ID=$RUN_ID"
+  note "WEB_BASE=$WEB_BASE"
+  note "API_BASE=$API_BASE"
+  note "DB_PATH=$DB_PATH"
+
+  if pid_alive "$API_PID"; then
+    note "api_pid=$API_PID alive"
+  else
+    bad "api pid $API_PID is not running"
+  fi
+  if pid_alive "$WEB_PID"; then
+    note "web_pid=$WEB_PID alive"
+  else
+    bad "web pid $WEB_PID is not running"
+  fi
+
+  local api_cmd web_cmd
+  api_cmd="$(pid_command "$API_PID")"
+  web_cmd="$(pid_command "$WEB_PID")"
+  if [[ "$api_cmd" == *uvicorn* && "$api_cmd" == *"--port $API_PORT"* ]]; then
+    note "api_command=uvicorn port $API_PORT"
+  else
+    bad "api pid $API_PID command is not this run's uvicorn: $api_cmd"
+  fi
+  if [[ "$web_cmd" == *vite* && "$web_cmd" == *"--port $WEB_PORT"* ]]; then
+    note "web_command=vite port $WEB_PORT"
+  else
+    bad "web pid $WEB_PID command is not this run's vite: $web_cmd"
+  fi
+
+  local api_owner web_owner
+  api_owner="$(port_owner "$API_PORT")"
+  web_owner="$(port_owner "$WEB_PORT")"
+  if [[ "$api_owner" == "$API_PID" ]]; then
+    note "api_port_owner=$api_owner"
+  else
+    bad "port $API_PORT is owned by '${api_owner:-nobody}', expected $API_PID"
+  fi
+  if [[ "$web_owner" == "$WEB_PID" ]]; then
+    note "web_port_owner=$web_owner"
+  else
+    bad "port $WEB_PORT is owned by '${web_owner:-nobody}', expected $WEB_PID"
+  fi
+
+  [[ -f "$DB_PATH" ]] || bad "sqlite file missing: $DB_PATH"
+  [[ "$DB_PATH" != "$ROOT/vin.db" ]] || bad "database is the repo vin.db"
+
+  local health root_body
+  if health="$(curl -sf "$API_BASE/health")"; then
+    if "$PY" -c 'import json,sys; body=json.loads(sys.argv[1]); assert body.get("status")=="ok" and body.get("api")=="ok" and body.get("database",{}).get("status")=="ok"' "$health"; then
+      note "health=ok database=ok"
+    else
+      bad "health body is not ready: $health"
+    fi
+  else
+    bad "GET $API_BASE/health failed"
+  fi
+  if root_body="$(curl -sf "$API_BASE/")"; then
+    if "$PY" -c 'import json,sys; body=json.loads(sys.argv[1]); assert body.get("service")=="VIN API" and body.get("version")=="1.0.0"' "$root_body"; then
+      note "api_version=1.0.0"
+    else
+      bad "root body is not VIN API 1.0.0: $root_body"
+    fi
+  else
+    bad "GET $API_BASE/ failed"
+  fi
+  if curl -sf "$WEB_BASE/" | grep -q '<title>Vin · Owen Labs</title>'; then
+    note "web_shell=Vin · Owen Labs"
+  else
+    bad "web UI is not the Vin shell at $WEB_BASE/"
+  fi
+
+  if "$PY" - "$API_BASE" "$VERIFY_BRUKER_ID" "$VERIFY_PASSWORD" <<'PY'
+import json, sys, urllib.request
+api, bruker, password = sys.argv[1:4]
+def call(method, path, payload=None, token=None):
+    data = None if payload is None else json.dumps(payload).encode()
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(api + path, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req) as res:
+        return json.loads(res.read().decode())
+auth = call("POST", "/api/auth/login", {"bruker_id": bruker, "password": password})
+me = call("GET", "/api/auth/me", token=auth["access_token"])
+page = call("GET", "/api/wines/page?page=1&page_size=20", token=auth["access_token"])
+names = sorted(item["name"] for item in page["items"])
+assert me["bruker_id"] == bruker, me
+assert names == ["Barolo Riserva", "Siste sjanse", "Ung Riesling"], names
+print(f"auth=ok bruker_id={me['bruker_id']} wines={page['total_items']}")
+PY
+  then
+    :
+  else
+    bad "seeded login or wine list check failed"
+  fi
+
+  if [[ "$fail" -ne 0 ]]; then
+    echo "doctor: not worth driving"
+    exit 1
+  fi
+  echo "doctor: worth driving"
+}
+
+cmd_cleanup() {
+  local run_id state
+  run_id="$(run_id_from_args "$@")"
+  state="$(state_file_for "$run_id")"
+  load_state "$state"
+
+  stop_pid() {
+    local pid="$1" expected="$2"
+    [[ -n "$pid" ]] || return 0
+    if ! pid_alive "$pid"; then
+      echo "pid $pid already stopped"
+      return 0
+    fi
+    local cmd
+    cmd="$(pid_command "$pid")"
+    if [[ "$cmd" != *"$expected"* ]]; then
+      die "refusing to kill pid $pid; command does not look like $expected: $cmd"
+    fi
+    kill "$pid" 2>/dev/null || true
+    local i
+    for ((i = 0; i < 20; i++)); do
+      pid_alive "$pid" || return 0
+      sleep 0.25
+    done
+    kill -9 "$pid" 2>/dev/null || true
+  }
+
+  stop_pid "$API_PID" "uvicorn"
+  stop_pid "$WEB_PID" "vite"
+  rm -rf "$DATA_DIR"
+  if [[ -f "$LATEST" ]] && [[ "$(tr -d '[:space:]' < "$LATEST")" == "$run_id" ]]; then
+    rm -f "$LATEST"
+  fi
+  echo "cleaned RUN_ID=$run_id"
+  echo "evidence remains at $SKILL_DIR/artifacts/$run_id"
+}
+
+cmd_state() {
+  local run_id state
+  run_id="$(run_id_from_args "$@")"
+  state="$(state_file_for "$run_id")"
+  cat "$state"
+}
+
+main() {
+  local cmd="${1:-}"
+  shift || true
+  case "$cmd" in
+    launch) cmd_launch "$@" ;;
+    doctor) cmd_doctor "$@" ;;
+    cleanup) cmd_cleanup "$@" ;;
+    state) cmd_state "$@" ;;
+    -h|--help|help|"") usage ;;
+    *) die "unknown command: $cmd" ;;
+  esac
+}
+
+main "$@"

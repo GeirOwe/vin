@@ -26,5 +26,9 @@ frontend/dist/
 *.db
 vin.db
 
+# Local verification proof
+.cursor/skills/verify-vin/artifacts/
+.cursor/skills/verify-vin/runtime/
+
 # MCP local config
 /.mcp.json
