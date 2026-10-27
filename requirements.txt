@@ -4,6 +4,7 @@ SQLAlchemy==2.0.34
 pydantic==2.9.2
 python-dotenv==1.0.1
 httpx==0.27.2
+certifi==2026.10.23
 psycopg2-binary==2.9.9
 python-multipart==0.0.9
 passlib[bcrypt]==1.7.4
