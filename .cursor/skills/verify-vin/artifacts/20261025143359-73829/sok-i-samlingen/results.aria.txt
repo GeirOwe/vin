@@ -1,0 +1,13 @@
+feature: sok-i-samlingen
+sub-feature: search-match
+entry: textbox "Søk på navn eller produsent" on /
+url: http://127.0.0.1:51721/
+query: riesling
+document: Vin · Owen Labs
+heading: Din samling
+visible-wines:
+- Åpne Ung Riesling
+absent:
+- Åpne Barolo Riserva
+- Åpne Siste sjanse
+listitem: Ung Riesling Dr. Loosen · 2024 Pris 220 kr Etter 29.11.2027 Før 2.1.2029 3 flasker
