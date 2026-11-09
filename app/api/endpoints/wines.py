@@ -120,13 +120,24 @@ def food_rows(wine: Wine) -> List[FoodPairing]:
 
 
 def replace_food_pairings(wine: Wine, pairings: List[FoodPairing]) -> None:
-    wine.food_pairings.clear()
-    seen: set[str] = set()
+    """Keep one row per code. A code that stays is updated in place.
+
+    Inserting a new row for a code that is also deleted in the same flush
+    breaks uq_wine_food_code, because the insert runs before the delete.
+    """
+    wanted: dict[str, str] = {}
     for item in pairings:
-        if item.code in seen:
-            continue
-        seen.add(item.code)
-        wine.food_pairings.append(WineFoodPairing(code=item.code, name=item.name))
+        if item.code not in wanted:
+            wanted[item.code] = item.name
+    current = {row.code: row for row in list(wine.food_pairings)}
+    for code, row in current.items():
+        if code not in wanted:
+            wine.food_pairings.remove(row)
+        elif row.name != wanted[code]:
+            row.name = wanted[code]
+    for code, name in wanted.items():
+        if code not in current:
+            wine.food_pairings.append(WineFoodPairing(code=code, name=name))
 
 
 def apply_filters(
