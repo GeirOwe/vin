@@ -1,6 +1,6 @@
 # Tomme flasker
 
-Tomme lists bottles whose quantity is 0. The seeded bottles have quantity 1, so they must not appear here.
+Tomme lists bottles whose quantity is 0 or has no quantity stored. The seeded bottles have quantity 1, so they must not appear here.
 
 ## Sub-features
 

@@ -30,6 +30,7 @@ Preconditions:
 ## Gotchas
 
 - The list updates 300ms after typing stops. A snapshot taken in that gap still shows both wines.
+- A pressed food tab replaces `Ingen viner funnet.` with `Ingen viner passer til {name}.` Leave `Alle` pressed for this journey. `Nullstill` clears the food tab too.
 - Quantity 0 and an empty quantity are hidden from this list. A seeded wine with quantity 1 is required.
 - The search field's accessible name is `Søk på navn eller produsent`, taken from its placeholder. There is no separate label.
 - `total_items` in the page JSON can count another user's wines. Judge the names in `items` and the buttons on screen. See `formal-vin-cellar` for that count.

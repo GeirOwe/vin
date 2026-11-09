@@ -33,3 +33,7 @@ This directory is the maintained source for verifying what a person can do in Vi
 - [Legg til vin](./legg-til-vin.md) covers creating a bottle from the form.
 - [Drikkevindu](./drikkevindu.md) covers the three drinking-window tabs.
 - [Tomme flasker](./tomme.md) covers the empty-bottle list.
+- [Matparing](./matparing.md) covers the food tabs and the batch fetch.
+- [Kode på flasken](./kode-paa-flasken.md) covers typing a product number into the add form.
+- [Oppdater fra Vinmonopolet](./oppdater-fra-vinmonopolet.md) covers fetching a code onto an existing wine and saving it.
+- [Slett vin](./slett-vin.md) covers deleting a wine that still has bottles.
