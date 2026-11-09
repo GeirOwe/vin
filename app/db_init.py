@@ -55,5 +55,6 @@ def ensure_schema() -> None:
     _add_column_if_missing("wines", "label_image_content_type", "VARCHAR(100)")
     _add_column_if_missing("wines", "taste_dice", "INTEGER")
     _add_column_if_missing("wines", "taste_verdict", "VARCHAR(50)")
+    _add_column_if_missing("wines", "varenummer", "VARCHAR(32)")
 
     logger.info("Database schema ready")

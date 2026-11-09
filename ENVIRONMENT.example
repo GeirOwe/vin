@@ -20,6 +20,10 @@
 EXTERNAL_WINE_API_BASE_URL=https://api.example-wine.com
 EXTERNAL_WINE_API_KEY=your_api_key_here
 
+# Vinmonopolet product lookup (barcode / QR on Legg til vin). Key stays on the server.
+# VINMONOPOLET_API_KEY=your_subscription_key
+# VINMONOPOLET_API_BASE=https://apis.vinmonopolet.no
+
 # xAI / Grok — wine label photo extraction (Add Wine → Scan label)
 # Get a key at https://console.x.ai/
 XAI_API_KEY=your_xai_api_key_here

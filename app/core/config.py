@@ -66,6 +66,22 @@ class ExternalWineApiConfig:
 
 
 @dataclass(frozen=True)
+class VinmonopoletConfig:
+    """Vinmonopolet product API. The key stays on the server."""
+    api_key: str | None
+    api_base: str
+    store_base: str
+
+    @classmethod
+    def from_env(cls) -> VinmonopoletConfig:
+        return cls(
+            api_key=os.getenv("VINMONOPOLET_API_KEY"),
+            api_base=os.getenv("VINMONOPOLET_API_BASE", "https://apis.vinmonopolet.no").rstrip("/"),
+            store_base=os.getenv("VINMONOPOLET_STORE_BASE", "https://www.vinmonopolet.no").rstrip("/"),
+        )
+
+
+@dataclass(frozen=True)
 class XaiConfig:
     """xAI (Grok) API configuration for label image extraction."""
     api_key: str | None
@@ -107,6 +123,7 @@ class Settings:
     database: DatabaseConfig
     cors: CORSConfig
     external_wine_api: ExternalWineApiConfig
+    vinmonopolet: VinmonopoletConfig
     xai: XaiConfig
     logging: LoggingConfig
     environment: str
@@ -120,6 +137,7 @@ class Settings:
             database=DatabaseConfig.from_env(),
             cors=CORSConfig.from_env(),
             external_wine_api=ExternalWineApiConfig.from_env(),
+            vinmonopolet=VinmonopoletConfig.from_env(),
             xai=XaiConfig.from_env(),
             logging=LoggingConfig.from_env(),
             environment=environment,

@@ -4,6 +4,7 @@ import { API_BASE, authHeaders } from '../hooks/useApi'
 type ThumbProps = {
   wineId: number
   enabled?: boolean
+  imageUrl?: string
   alt?: string
   className?: string
   onOpen?: () => void
@@ -12,15 +13,18 @@ type ThumbProps = {
 export function WineLabelThumb({
   wineId,
   enabled = true,
+  imageUrl,
   alt = 'Etikett',
   className = '',
   onOpen,
 }: ThumbProps) {
   const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
+    setFailed(false)
     if (!enabled) {
-      setSrc(null)
+      setSrc(imageUrl ?? null)
       return
     }
     let objectUrl: string | null = null
@@ -46,9 +50,9 @@ export function WineLabelThumb({
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [wineId, enabled])
+  }, [wineId, enabled, imageUrl])
 
-  if (!enabled || !src) {
+  if (failed || !src) {
     return (
       <div
         className={`entity-row__thumb entity-row__thumb--empty ${className}`.trim()}
@@ -68,28 +72,34 @@ export function WineLabelThumb({
         }}
         aria-label={`Vis større bilde: ${alt}`}
       >
-        <img className={`entity-row__thumb ${className}`.trim()} src={src} alt={alt} />
+        <img className={`entity-row__thumb ${className}`.trim()} src={src} alt={alt} onError={() => setFailed(true)} />
       </button>
     )
   }
 
-  return <img className={`entity-row__thumb ${className}`.trim()} src={src} alt={alt} />
+  return <img className={`entity-row__thumb ${className}`.trim()} src={src} alt={alt} onError={() => setFailed(true)} />
 }
 
 type LightboxProps = {
   wineId: number
+  imageUrl?: string
   alt?: string
   open: boolean
   onClose: () => void
 }
 
-export function WineLabelLightbox({ wineId, alt = 'Etikett', open, onClose }: LightboxProps) {
+export function WineLabelLightbox({ wineId, imageUrl, alt = 'Etikett', open, onClose }: LightboxProps) {
   const [src, setSrc] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!open) {
       setSrc(null)
+      return
+    }
+    if (imageUrl) {
+      setSrc(imageUrl)
+      setLoading(false)
       return
     }
     let objectUrl: string | null = null
@@ -116,7 +126,7 @@ export function WineLabelLightbox({ wineId, alt = 'Etikett', open, onClose }: Li
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [wineId, open])
+  }, [wineId, open, imageUrl])
 
   useEffect(() => {
     if (!open) return
