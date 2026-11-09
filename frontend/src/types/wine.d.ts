@@ -23,6 +23,7 @@ export interface Wine {
   taste_verdict?: string | null
   grape_composition: Grape[]
   has_label_image?: boolean
+  varenummer?: string | null
 }
 
 export interface WineListItem {
@@ -39,6 +40,7 @@ export interface WineListItem {
   taste_verdict?: string | null
   grape_composition: Grape[]
   has_label_image?: boolean
+  varenummer?: string | null
 }
 
 export type WineType = 'Red' | 'White' | 'Rose' | 'Sparkling' | 'Dessert' | 'Fortified'

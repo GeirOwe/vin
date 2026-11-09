@@ -5,6 +5,7 @@ import { PricingQuantityInput } from './PricingQuantityInput'
 import DrinkingWindowInput from './DrinkingWindowInput'
 import { GrapeCompositionInput } from './GrapeCompositionInput'
 import { LabelScanInput, type LabelExtractionResult } from './LabelScanInput'
+import { BarcodeScanInput, type BarcodeLookupResult } from './BarcodeScanInput'
 
 function normalizeGrapes(
   grapes: LabelExtractionResult['grape_composition']
@@ -49,9 +50,9 @@ export default function WineEntryForm() {
   const [prefill, setPrefill] = useState<any>({})
   const [labelImage, setLabelImage] = useState<Blob | null>(null)
 
-  const applyLabelExtraction = (extracted: LabelExtractionResult) => {
+  const applySuggestion = (extracted: LabelExtractionResult | BarcodeLookupResult) => {
     const grape_composition = normalizeGrapes(extracted.grape_composition)
-    const next = {
+    const next: any = {
       name: extracted.name || undefined,
       type: extracted.type || undefined,
       producer: extracted.producer || undefined,
@@ -60,6 +61,12 @@ export default function WineEntryForm() {
       district: extracted.district || undefined,
       subdistrict: extracted.subdistrict || undefined,
       grape_composition,
+    }
+    if ('purchase_price' in extracted && extracted.purchase_price != null) {
+      next.purchase_price = extracted.purchase_price
+    }
+    if ('varenummer' in extracted) {
+      next.varenummer = extracted.varenummer || undefined
     }
     setPrefill(next)
     setForm((f: any) => ({ ...f, ...next }))
@@ -77,8 +84,10 @@ export default function WineEntryForm() {
 
   return (
     <div className="section">
+      <BarcodeScanInput onFound={applySuggestion} disabled={loading} />
+
       <LabelScanInput
-        onExtracted={applyLabelExtraction}
+        onExtracted={applySuggestion}
         onImageChange={setLabelImage}
         disabled={loading}
       />

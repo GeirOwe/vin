@@ -27,11 +27,14 @@ from ...schemas import (
     TastingNoteResponse,
     WineConsumptionResponse,
     LabelExtractionResponse,
+    BarcodeLookupRequest,
+    BarcodeLookupResponse,
     WineFilterOptionsResponse,
 )
 from ...services.wine_api_service import fetch_drinking_window_suggestion, ExternalApiError, SupportedWineType
 from ...services.label_extraction_service import extract_wine_from_label_image, LabelExtractionError
-from ...core.config import XaiConfig
+from ...services.vinmonopolet_service import lookup_wine_code, VinmonopoletLookupError
+from ...core.config import XaiConfig, VinmonopoletConfig
 
 
 router = APIRouter(prefix="/api/wines", tags=["wines"])
@@ -99,6 +102,7 @@ def to_wine_response(wine: Wine) -> WineResponse:
             for gc in (wine.grape_compositions or [])
         ],
         has_label_image=wine_has_label(wine),
+        varenummer=wine.varenummer,
     )
 
 
@@ -344,6 +348,7 @@ def list_wines_page(
                     for gc in (w.grape_compositions or [])
                 ],
                 has_label_image=wine_has_label(w),
+                varenummer=w.varenummer,
             )
             for w in wines
         ]
@@ -631,6 +636,20 @@ async def extract_from_label(
         raise HTTPException(status_code=status, detail=message)
 
 
+@router.post("/lookup-barcode", response_model=BarcodeLookupResponse)
+async def lookup_barcode(
+    payload: BarcodeLookupRequest,
+    current_user: User = Depends(get_current_user),
+) -> BarcodeLookupResponse:
+    """
+    Resolve a scanned QR code, EAN, or varenummer through Vinmonopolet.
+    Does not create a wine. The client reviews the fields and submits POST /api/wines.
+    """
+    try:
+        return await lookup_wine_code(payload.code, VinmonopoletConfig.from_env())
+    except VinmonopoletLookupError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+
 
 @router.get("/{wine_id}/label-image")
 def get_wine_label_image(
@@ -671,6 +690,7 @@ def create_wine(
             drink_before_date=payload.drink_before_date,
             label_image=label_bytes,
             label_image_content_type=label_type if label_bytes else None,
+            varenummer=payload.varenummer,
         )
         db.add(wine)
         db.flush()

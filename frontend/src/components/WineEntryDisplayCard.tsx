@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { WineLabelLightbox, WineLabelThumb } from './WineLabelThumb'
 import { formatTasteDice, tasteVerdictLabel } from '../lib/taste'
+import { vinmonopoletImageUrl } from '../lib/vinmonopolet'
 
 type WineCardProps = {
   wine: {
@@ -15,6 +16,7 @@ type WineCardProps = {
     taste_dice?: number | null
     taste_verdict?: string | null
     has_label_image?: boolean
+    varenummer?: string | null
   }
   onClick?: (id: number) => void
 }
@@ -41,6 +43,9 @@ function formatDate(value?: string | null): string {
 
 export default function WineEntryDisplayCard({ wine, onClick }: WineCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const bottleSrc = !wine.has_label_image && wine.varenummer
+    ? vinmonopoletImageUrl(wine.varenummer)
+    : undefined
   const meta = [wine.producer, wine.vintage].filter(Boolean).join(' · ') || '—'
   const hasTaste = wine.taste_dice != null || Boolean(wine.taste_verdict)
 
@@ -48,6 +53,7 @@ export default function WineEntryDisplayCard({ wine, onClick }: WineCardProps) {
     <>
       <WineLabelLightbox
         wineId={wine.id}
+        imageUrl={bottleSrc}
         alt={`Etikett for ${wine.name}`}
         open={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
@@ -61,9 +67,10 @@ export default function WineEntryDisplayCard({ wine, onClick }: WineCardProps) {
         <WineLabelThumb
           wineId={wine.id}
           enabled={Boolean(wine.has_label_image)}
+          imageUrl={bottleSrc}
           alt={`Etikett for ${wine.name}`}
           onOpen={
-            wine.has_label_image
+            wine.has_label_image || bottleSrc
               ? () => setLightboxOpen(true)
               : undefined
           }

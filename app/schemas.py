@@ -13,7 +13,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import List, Optional, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class GrapeCompositionSchema(BaseModel):
@@ -76,6 +76,19 @@ class WineCreateRequest(BaseModel):
         max_length=100,
         description="MIME type for label image, e.g. image/jpeg",
     )
+    varenummer: Optional[str] = Field(default=None, max_length=32)
+
+    @field_validator("varenummer")
+    @classmethod
+    def varenummer_digits(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        if not cleaned.isdigit():
+            raise ValueError("varenummer must contain only digits")
+        return cleaned
 
     @model_validator(mode="after")
     def validate_dates_and_grapes(self) -> "WineCreateRequest":
@@ -149,6 +162,7 @@ class WineResponse(BaseModel):
     taste_verdict: Optional[TasteVerdict] = None
     grape_composition: List[GrapeCompositionResponse] = []
     has_label_image: bool = False
+    varenummer: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -174,6 +188,25 @@ class LabelExtractionResponse(BaseModel):
     district: Optional[str] = None
     subdistrict: Optional[str] = None
     grape_composition: Optional[List[LabelGrapeComposition]] = None
+    notes: Optional[str] = None
+
+
+class BarcodeLookupRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=500)
+
+
+class BarcodeLookupResponse(BaseModel):
+    """Suggested wine fields from a Vinmonopolet barcode or QR code. Does not create a wine."""
+    name: Optional[str] = None
+    type: Optional["WineType"] = None
+    producer: Optional[str] = None
+    vintage: Optional[int] = Field(default=None, ge=1800, le=2100)
+    country: Optional[str] = None
+    district: Optional[str] = None
+    subdistrict: Optional[str] = None
+    grape_composition: Optional[List[LabelGrapeComposition]] = None
+    purchase_price: Optional[float] = Field(default=None, ge=0)
+    varenummer: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -245,6 +278,7 @@ class WineListItem(BaseModel):
     taste_verdict: Optional[TasteVerdict] = None
     grape_composition: List[GrapeCompositionResponse] = []
     has_label_image: bool = False
+    varenummer: Optional[str] = None
 
     class Config:
         from_attributes = True

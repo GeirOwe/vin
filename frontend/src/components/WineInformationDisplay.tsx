@@ -5,6 +5,7 @@ import { useApi } from '../hooks/useApi'
 import InventoryTrackingSystemView from './InventoryTrackingSystemView'
 import { GrapeCompositionInput, type GrapeComposition } from './GrapeCompositionInput'
 import { WineLabelLightbox, WineLabelThumb } from './WineLabelThumb'
+import { vinmonopoletImageUrl } from '../lib/vinmonopolet'
 import { TASTE_VERDICTS, formatTasteDice, tasteVerdictLabel, type TasteVerdict } from '../lib/taste'
 
 interface WineInformationDisplayProps {
@@ -277,6 +278,7 @@ export default function WineInformationDisplay({
 
       <WineLabelLightbox
         wineId={wine.id}
+        imageUrl={!wine.has_label_image && wine.varenummer ? vinmonopoletImageUrl(wine.varenummer) : undefined}
         alt={`Etikett for ${wine.name}`}
         open={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
@@ -288,9 +290,10 @@ export default function WineInformationDisplay({
             key={`hero-thumb-${labelThumbKey}`}
             wineId={wine.id}
             enabled={Boolean(wine.has_label_image)}
+            imageUrl={!wine.has_label_image && wine.varenummer ? vinmonopoletImageUrl(wine.varenummer) : undefined}
             alt={`Etikett for ${wine.name}`}
             className="entity-row__thumb--lg"
-            onOpen={wine.has_label_image ? () => setLightboxOpen(true) : undefined}
+            onOpen={wine.has_label_image || wine.varenummer ? () => setLightboxOpen(true) : undefined}
           />
           <div>
             <h1 className="wine-detail__title">{wine.name}</h1>
@@ -387,9 +390,10 @@ export default function WineInformationDisplay({
                     key={`edit-thumb-${labelThumbKey}`}
                     wineId={wine.id}
                     enabled={Boolean(wine.has_label_image)}
+                    imageUrl={!wine.has_label_image && wine.varenummer ? vinmonopoletImageUrl(wine.varenummer) : undefined}
                     alt={`Etikett for ${wine.name}`}
                     className="entity-row__thumb--lg"
-                    onOpen={wine.has_label_image ? () => setLightboxOpen(true) : undefined}
+                    onOpen={wine.has_label_image || wine.varenummer ? () => setLightboxOpen(true) : undefined}
                   />
                 )}
                 <label className="btn btn--ghost btn--small cursor-pointer">

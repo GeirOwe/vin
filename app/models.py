@@ -97,6 +97,7 @@ class Wine(Base):
     taste_verdict: Mapped[str | None] = mapped_column(String(50), nullable=True)
     label_image: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     label_image_content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    varenummer: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     owner: Mapped[User] = relationship(back_populates="wines")
 
