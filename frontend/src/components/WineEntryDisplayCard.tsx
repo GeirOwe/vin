@@ -17,6 +17,7 @@ type WineCardProps = {
     taste_verdict?: string | null
     has_label_image?: boolean
     varenummer?: string | null
+    food_pairings?: Array<{ name: string }> | null
   }
   onClick?: (id: number) => void
 }
@@ -78,6 +79,11 @@ export default function WineEntryDisplayCard({ wine, onClick }: WineCardProps) {
         <div className="entity-row__main">
           <span className="entity-row__name">{wine.name}</span>
           <span className="entity-row__meta">{meta}</span>
+          {wine.food_pairings && wine.food_pairings.length > 0 && (
+            <span className="entity-row__meta">
+              Passer til {wine.food_pairings.map((food) => food.name).join(', ')}
+            </span>
+          )}
           <div className="entity-row__facts">
             <span>
               <em>Pris</em> {formatPrice(wine.purchase_price)}

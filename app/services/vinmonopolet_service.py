@@ -16,7 +16,22 @@ from typing import Any
 import httpx
 
 from ..core.config import VinmonopoletConfig
-from ..schemas import BarcodeLookupResponse, LabelGrapeComposition, WineType
+from ..schemas import BarcodeLookupResponse, FoodPairing, LabelGrapeComposition, WineType
+
+FOOD_PAIRING_CHOICES = (
+    ("A", "Aperitif"),
+    ("B", "Skalldyr"),
+    ("C", "Fisk"),
+    ("R", "Grønnsaker"),
+    ("D", "Lyst kjøtt"),
+    ("Q", "Svin"),
+    ("E", "Storfe"),
+    ("F", "Lam"),
+    ("G", "Småvilt"),
+    ("H", "Storvilt"),
+    ("L", "Ost"),
+    ("N", "Dessert"),
+)
 
 _PRODUCT_PATH = re.compile(r"/p/(\d{2,12})(?:\D|$)")
 _YEAR_AT_END = re.compile(r"(?:^|\s)((?:19|20)\d{2})$")
@@ -108,6 +123,7 @@ def map_lookup(
     price = _store_price(store) or _official_price(official) or _as_price(barcode_hit.get("price"))
     grapes = _grapes_from_official(official) or _grapes_from_store(store)
     notes = _notes(store)
+    foods = food_pairings_from_store(store)
 
     return BarcodeLookupResponse(
         name=name[:255],
@@ -121,6 +137,7 @@ def map_lookup(
         purchase_price=price,
         varenummer=str(product_id),
         notes=notes,
+        food_pairings=foods,
     )
 
 
@@ -158,6 +175,35 @@ async def lookup_wine_code(raw: str, config: VinmonopoletConfig) -> BarcodeLooku
     if store is None:
         store = store_try
     return map_lookup(str(product_id), store, official, barcode_hit)
+
+
+def food_pairings_from_store(store: dict[str, Any] | None) -> list[FoodPairing]:
+    """Read Passer til from the storefront product. The official API does not send it."""
+    if not isinstance(store, dict):
+        return []
+    content = store.get("content") if isinstance(store.get("content"), dict) else {}
+    items = content.get("isGoodFor")
+    if not isinstance(items, list):
+        return []
+    found: list[FoodPairing] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        code = str(item.get("code") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not code or not name or code in seen:
+            continue
+        seen.add(code)
+        found.append(FoodPairing(code=code[:8], name=name[:80]))
+    return found
+
+
+async def fetch_food_pairings(product_id: str, config: VinmonopoletConfig) -> list[FoodPairing]:
+    store = await _store_product(product_id, config)
+    if not store:
+        raise VinmonopoletLookupError("Fant ikke matparing hos Vinmonopolet.", 404)
+    return food_pairings_from_store(store)
 
 
 def _wine_type(category: str | None) -> WineType | None:

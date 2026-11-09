@@ -15,6 +15,7 @@ export type BarcodeLookupResult = {
   purchase_price?: number | null
   varenummer?: string | null
   notes?: string | null
+  food_pairings?: Array<{ code: string; name: string }> | null
 }
 
 type Props = {

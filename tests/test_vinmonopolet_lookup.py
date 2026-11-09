@@ -80,6 +80,26 @@ def test_map_lookup_skips_ingredient_lists_that_are_not_grapes():
     assert result.vintage is None
 
 
+def test_map_lookup_reads_food_pairings():
+    store = {
+        **STORE,
+        "content": {
+            **STORE["content"],
+            "isGoodFor": [
+                {"code": "B", "name": "Skalldyr"},
+                {"code": "C", "name": "Fisk"},
+                {"code": "R", "name": "Grønnsaker"},
+            ],
+        },
+    }
+    result = map_lookup("17134701", store, None, None)
+    assert [(item.code, item.name) for item in result.food_pairings] == [
+        ("B", "Skalldyr"),
+        ("C", "Fisk"),
+        ("R", "Grønnsaker"),
+    ]
+
+
 def test_official_grapes_are_used_when_present():
     official = {
         "basic": {"productShortName": "Kort navn", "vintage": "2019"},
@@ -226,6 +246,7 @@ if __name__ == "__main__":
     test_parse_barcode_payload_reads_code_name_and_price()
     test_map_lookup_fills_the_cellar_fields()
     test_map_lookup_skips_ingredient_lists_that_are_not_grapes()
+    test_map_lookup_reads_food_pairings()
     test_official_grapes_are_used_when_present()
     test_storefront_rejection_keeps_the_official_name()
     test_official_rejection_still_names_the_key()

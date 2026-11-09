@@ -20,6 +20,7 @@ from sqlalchemy import (
     String,
     Text,
     CheckConstraint,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -113,6 +114,10 @@ class Wine(Base):
         back_populates="wine", cascade="all, delete-orphan"
     )
 
+    food_pairings: Mapped[List["WineFoodPairing"]] = relationship(
+        back_populates="wine", cascade="all, delete-orphan"
+    )
+
 
 class GrapeComposition(Base):
     """
@@ -141,6 +146,22 @@ class GrapeComposition(Base):
     percentage: Mapped[float] = mapped_column(Float, nullable=False)
 
     wine: Mapped[Wine] = relationship(back_populates="grape_compositions")
+
+
+class WineFoodPairing(Base):
+    """A Vinmonopolet food match stored on one wine. code is the stable key."""
+
+    __tablename__ = "wine_food_pairings"
+    __table_args__ = (
+        UniqueConstraint("wine_id", "code", name="uq_wine_food_code"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    wine_id: Mapped[int] = mapped_column(ForeignKey("wines.id", ondelete="CASCADE"), nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(8), nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+
+    wine: Mapped[Wine] = relationship(back_populates="food_pairings")
 
 
 class InventoryLog(Base):

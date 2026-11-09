@@ -73,7 +73,7 @@ If a change is supposed to count differently, rewrite the expected number in `ch
 
 ## What this does not cover
 
-The check does not open the browser, does not cover `GET /api/wines` without `/page`, and does not cover drinking-window status, grape filters, or pagination past the first page. Quantity `null` and `0` are included because Samling hides them. Pass means the generated cases matched. It does not mean every future filter is safe.
+The check does not open the browser, does not cover `GET /api/wines` without `/page`, and does not cover drinking-window status, grape filters, the food pairing filter, or pagination past the first page. Quantity `null` and `0` are included because Samling hides them. Pass means the generated cases matched. It does not mean every future filter is safe.
 
 ## Proof that the check can fail
 

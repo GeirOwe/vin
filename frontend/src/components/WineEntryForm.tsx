@@ -68,6 +68,9 @@ export default function WineEntryForm() {
     if ('varenummer' in extracted) {
       next.varenummer = extracted.varenummer || undefined
     }
+    if ('food_pairings' in extracted && extracted.food_pairings?.length) {
+      next.food_pairings = extracted.food_pairings
+    }
     setPrefill(next)
     setForm((f: any) => ({ ...f, ...next }))
     setFormKey((k) => k + 1)
@@ -85,6 +88,11 @@ export default function WineEntryForm() {
   return (
     <div className="section">
       <BarcodeScanInput onFound={applySuggestion} disabled={loading} />
+      {Array.isArray(prefill.food_pairings) && prefill.food_pairings.length > 0 && (
+        <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>
+          Passer til {prefill.food_pairings.map((food: { name: string }) => food.name).join(', ')}
+        </p>
+      )}
 
       <LabelScanInput
         onExtracted={applySuggestion}

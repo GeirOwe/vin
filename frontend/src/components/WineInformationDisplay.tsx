@@ -54,6 +54,8 @@ export default function WineInformationDisplay({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [foodBusy, setFoodBusy] = useState(false)
+  const [foodError, setFoodError] = useState<string | null>(null)
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -72,6 +74,24 @@ export default function WineInformationDisplay({
       const message = err instanceof Error ? err.message : 'Klarte ikke å slette vinen'
       setDeleteError(message)
       setDeleting(false)
+    }
+  }
+
+  const refreshFood = async () => {
+    setFoodBusy(true)
+    setFoodError(null)
+    try {
+      const res = await fetch(`${API_BASE}/api/wines/${wine.id}/food-pairings`, {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(errorMessage(data, res.status))
+      onWineUpdate?.()
+    } catch (err: unknown) {
+      setFoodError(err instanceof Error ? err.message : 'Klarte ikke å hente matparing')
+    } finally {
+      setFoodBusy(false)
     }
   }
   const [isEditingDruer, setIsEditingDruer] = useState(false)
@@ -718,6 +738,25 @@ export default function WineInformationDisplay({
           </p>
         )}
       </section>
+
+      {showInventoryTracking && (
+        <section className="wine-block">
+          <div className="wine-block__head">
+            <h2>Passer til</h2>
+            {wine.varenummer && (
+              <button type="button" className="btn btn--ghost btn--small" onClick={refreshFood} disabled={foodBusy}>
+                {foodBusy ? 'Henter…' : 'Hent fra Vinmonopolet'}
+              </button>
+            )}
+          </div>
+          <p className="wine-field__value">
+            {wine.food_pairings && wine.food_pairings.length > 0
+              ? wine.food_pairings.map((food) => food.name).join(', ')
+              : 'Ingen matparing lagret.'}
+          </p>
+          {foodError && <p className="text-sm mt-2" style={{ color: 'var(--danger)' }}>{foodError}</p>}
+        </section>
+      )}
 
       {showInventoryTracking && (
         <section className="wine-block">

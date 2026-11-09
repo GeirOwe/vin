@@ -16,6 +16,21 @@ from typing import List, Optional, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+class FoodPairing(BaseModel):
+    """One dish category from Vinmonopolet, such as Fisk or Grønnsaker."""
+
+    code: str = Field(min_length=1, max_length=8)
+    name: str = Field(min_length=1, max_length=80)
+
+    @field_validator("code", "name")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("food pairing text is empty")
+        return cleaned
+
+
 class GrapeCompositionSchema(BaseModel):
     """
     Schema for grape composition data.
@@ -77,6 +92,7 @@ class WineCreateRequest(BaseModel):
         description="MIME type for label image, e.g. image/jpeg",
     )
     varenummer: Optional[str] = Field(default=None, max_length=32)
+    food_pairings: Optional[List[FoodPairing]] = Field(default=None, max_length=12)
 
     @field_validator("varenummer")
     @classmethod
@@ -163,6 +179,7 @@ class WineResponse(BaseModel):
     grape_composition: List[GrapeCompositionResponse] = []
     has_label_image: bool = False
     varenummer: Optional[str] = None
+    food_pairings: List[FoodPairing] = []
 
     class Config:
         from_attributes = True
@@ -208,6 +225,7 @@ class BarcodeLookupResponse(BaseModel):
     purchase_price: Optional[float] = Field(default=None, ge=0)
     varenummer: Optional[str] = None
     notes: Optional[str] = None
+    food_pairings: List[FoodPairing] = []
 
 
 # Filtering & pagination
@@ -236,6 +254,7 @@ class WineFilterParameters(BaseModel):
     district: Optional[str] = None
     subdistrict: Optional[str] = None
     grape: Optional[str] = None
+    food: Optional[str] = Field(default=None, max_length=8)
     drinking_window_status: Optional[Literal["ready_to_drink", "approaching_deadline", "not_ready"]] = None
 
 
@@ -243,6 +262,13 @@ class WineFilterOptionsResponse(BaseModel):
     types: List[str] = []
     districts: List[str] = []
     grapes: List[str] = []
+    foods: List[FoodPairing] = []
+
+
+class FoodPairingRefreshResponse(BaseModel):
+    updated: int
+    failed: int
+    skipped: int
 
 
 class PaginationParams(BaseModel):
@@ -279,6 +305,7 @@ class WineListItem(BaseModel):
     grape_composition: List[GrapeCompositionResponse] = []
     has_label_image: bool = False
     varenummer: Optional[str] = None
+    food_pairings: List[FoodPairing] = []
 
     class Config:
         from_attributes = True

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useApi, API_BASE, authHeaders } from '../hooks/useApi'
+import { useApi, API_BASE, authHeaders, errorMessage } from '../hooks/useApi'
 import { WineListItem, DrinkingWindowStatus, WineType } from '../types/wine'
 import WineEntryDisplayCard from './WineEntryDisplayCard'
 
@@ -21,10 +21,16 @@ interface FilterParams {
   quantity_filter?: 'non_zero' | 'zero' | 'all'
 }
 
+interface FoodChoice {
+  code: string
+  name: string
+}
+
 interface FilterOptions {
   types: string[]
   districts: string[]
   grapes: string[]
+  foods: FoodChoice[]
 }
 
 interface WineCollectionListViewProps {
@@ -61,9 +67,13 @@ export default function WineCollectionListView({
   const [wineType, setWineType] = useState('')
   const [grape, setGrape] = useState('')
   const [district, setDistrict] = useState('')
+  const [food, setFood] = useState('')
+  const [foodBusy, setFoodBusy] = useState(false)
+  const [foodMessage, setFoodMessage] = useState('')
+  const [optionsTick, setOptionsTick] = useState(0)
   const [sortBy, setSortBy] = useState<SortBy>('drink_before_date')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ types: [], districts: [], grapes: [] })
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ types: [], districts: [], grapes: [], foods: [] })
   const lastQueryRef = useRef<string>('')
 
   useEffect(() => {
@@ -90,7 +100,7 @@ export default function WineCollectionListView({
     return () => {
       cancelled = true
     }
-  }, [showSearchAndSort])
+  }, [showSearchAndSort, optionsTick])
 
   const typeChoices = useMemo(() => {
     const fromApi = filterOptions.types.length ? filterOptions.types : ALL_WINE_TYPES
@@ -103,6 +113,7 @@ export default function WineCollectionListView({
     if (wineType) params.set('wine_type', wineType)
     if (grape) params.set('grape', grape)
     if (district) params.set('district', district)
+    if (food) params.set('food', food)
     if (sortBy) params.set('sort_by', sortBy)
     if (sortOrder) params.set('sort_order', sortOrder)
     if (filterParams?.drinking_window_status) {
@@ -137,6 +148,7 @@ export default function WineCollectionListView({
     wineType,
     grape,
     district,
+    food,
     sortBy,
     sortOrder,
     filterParams?.drinking_window_status,
@@ -158,8 +170,64 @@ export default function WineCollectionListView({
       {showSearchAndSort && (
         <div className="section__head">
           <h2>Din samling</h2>
-          <p>Søk, filtrer og sorter samlingen.</p>
+          <p>Søk på navn, eller velg maten vinen skal passe til.</p>
         </div>
+      )}
+
+      {showSearchAndSort && (
+        <div className="filter-tabs" role="group" aria-label="Passer til">
+          <button
+            type="button"
+            className={`filter-tab ${food === '' ? 'is-active' : ''}`}
+            aria-pressed={food === ''}
+            onClick={() => setFood('')}
+          >
+            Alle
+          </button>
+          {filterOptions.foods.map((choice) => (
+            <button
+              key={choice.code}
+              type="button"
+              className={`filter-tab ${food === choice.code ? 'is-active' : ''}`}
+              aria-pressed={food === choice.code}
+              onClick={() => setFood(choice.code)}
+            >
+              {choice.name}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="btn btn--ghost btn--small"
+            onClick={async () => {
+              setFoodBusy(true)
+              setFoodMessage('')
+              try {
+                const res = await fetch(`${API_BASE}/api/wines/refresh-food-pairings`, {
+                  method: 'POST',
+                  headers: authHeaders(),
+                })
+                const json = await res.json().catch(() => null)
+                if (!res.ok) throw new Error(errorMessage(json, res.status))
+                setFoodMessage(
+                  `Oppdaterte ${json.updated} viner. ${json.failed} feilet. ${json.skipped} uten varenummer.`
+                )
+                setOptionsTick((tick) => tick + 1)
+                setPage(1)
+                fetchData(1)
+              } catch (err: unknown) {
+                setFoodMessage(err instanceof Error ? err.message : 'Klarte ikke å hente matparing')
+              } finally {
+                setFoodBusy(false)
+              }
+            }}
+            disabled={foodBusy}
+          >
+            {foodBusy ? 'Henter…' : 'Hent matparing'}
+          </button>
+        </div>
+      )}
+      {showSearchAndSort && foodMessage && (
+        <p className="text-sm" style={{ color: 'var(--ink-soft)', marginBottom: '1rem' }}>{foodMessage}</p>
       )}
 
       {showSearchAndSort && (
@@ -231,6 +299,7 @@ export default function WineCollectionListView({
               setWineType('')
               setGrape('')
               setDistrict('')
+              setFood('')
               setSortBy('name')
               setSortOrder('asc')
             }}
@@ -244,7 +313,11 @@ export default function WineCollectionListView({
       {error && <div className="text-sm" style={{ color: 'var(--danger)' }}>Feil: {error}</div>}
 
       {!loading && wines.length === 0 && (
-        <div className="empty-state">{emptyStateMessage || 'Ingen viner funnet.'}</div>
+        <div className="empty-state">
+          {emptyStateMessage || (food
+            ? `Ingen viner passer til ${filterOptions.foods.find((choice) => choice.code === food)?.name || 'denne maten'}.`
+            : 'Ingen viner funnet.')}
+        </div>
       )}
 
       <ul className="entity-list">
