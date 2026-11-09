@@ -378,6 +378,17 @@ body,
     color: var(--ink);
   }
 
+  .btn--danger {
+    background: transparent;
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+
+  .btn--danger:hover:not(:disabled) {
+    background: var(--danger);
+    color: #f7f6f2;
+  }
+
   .btn--small {
     padding: 0.4rem 0.7rem;
     font-size: 0.82rem;

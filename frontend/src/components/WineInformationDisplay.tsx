@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Input } from './ui/input'
 import { Wine } from '../types/wine'
-import { useApi } from '../hooks/useApi'
+import { useApi, API_BASE, authHeaders, errorMessage } from '../hooks/useApi'
 import InventoryTrackingSystemView from './InventoryTrackingSystemView'
 import { GrapeCompositionInput, type GrapeComposition } from './GrapeCompositionInput'
 import { WineLabelLightbox, WineLabelThumb } from './WineLabelThumb'
@@ -48,7 +49,31 @@ export default function WineInformationDisplay({
   onWineUpdate,
   showInventoryTracking = false,
 }: WineInformationDisplayProps) {
+  const navigate = useNavigate()
   const [isEditingOm, setIsEditingOm] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`${API_BASE}/api/wines/${wine.id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(errorMessage(data, res.status))
+      }
+      navigate('/')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Klarte ikke å slette vinen'
+      setDeleteError(message)
+      setDeleting(false)
+    }
+  }
   const [isEditingDruer, setIsEditingDruer] = useState(false)
   const [isEditingDrinkingWindow, setIsEditingDrinkingWindow] = useState(false)
   const [isEditingVurdering, setIsEditingVurdering] = useState(false)
@@ -706,6 +731,46 @@ export default function WineInformationDisplay({
           />
         </section>
       )}
+
+      {showInventoryTracking && (
+        <section className="wine-block">
+          <div className="wine-block__head">
+            <h2>Slett vin</h2>
+          </div>
+          {confirmDelete ? (
+            <div className="space-y-3">
+              <p className="wine-field__value">{deletePrompt(wine.name, wine.quantity)}</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn btn--danger" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? 'Sletter…' : 'Slett'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                >
+                  Avbryt
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="btn btn--ghost" onClick={() => setConfirmDelete(true)}>
+              Slett vin
+            </button>
+          )}
+          {deleteError && (
+            <p className="text-sm mt-2" style={{ color: 'var(--danger)' }}>{deleteError}</p>
+          )}
+        </section>
+      )}
     </div>
   )
+}
+
+function deletePrompt(name: string, quantity?: number | null): string {
+  const bottles = quantity ?? 0
+  if (bottles > 1) return `Slette ${name}? ${bottles} flasker slettes med vinen.`
+  if (bottles === 1) return `Slette ${name}? 1 flaske slettes med vinen.`
+  return `Slette ${name}? Vinen fjernes fra samlingen.`
 }

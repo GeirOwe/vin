@@ -359,6 +359,19 @@ def list_wines_page(
         raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail=str(exc))
 
 
+@router.delete("/{wine_id}", status_code=HTTPStatus.NO_CONTENT)
+def delete_wine(
+    wine_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Remove the wine and its bottles, notes, and log. Quantity does not block this."""
+    wine = get_owned_wine(db, wine_id, current_user.id)
+    db.delete(wine)
+    db.commit()
+    return Response(status_code=HTTPStatus.NO_CONTENT)
+
+
 @router.get("/{wine_id}", response_model=WineResponse)
 def get_wine(
     wine_id: int,

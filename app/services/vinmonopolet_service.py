@@ -1,9 +1,11 @@
 """Look up a Vinmonopolet bottle from a scanned QR code, barcode, or varenummer.
 
 The subscription key is sent only to apis.vinmonopolet.no. The storefront
-product call has no key. The official details feed currently returns the
-product id and short name. Grapes, place, producer, and price come from the
-storefront product when the official payload does not include them.
+product call has no key. A storefront 401 or 403 is a missing store payload,
+and the official response is still returned. Only the official host can
+reject the key. The official details feed currently returns the product id
+and short name. Grapes, place, producer, and price come from the storefront
+product when the official payload does not include them.
 """
 
 from __future__ import annotations
@@ -128,6 +130,7 @@ async def lookup_wine_code(raw: str, config: VinmonopoletConfig) -> BarcodeLooku
 
     kind, value = parse_scan(raw)
     barcode_hit: dict[str, Any] | None = None
+    store_try: dict[str, Any] | None = None
     if kind == "ean":
         barcode_hit = await _barcode_search(value, config)
         product_id = barcode_hit.get("code") if barcode_hit else None
@@ -141,12 +144,19 @@ async def lookup_wine_code(raw: str, config: VinmonopoletConfig) -> BarcodeLooku
             barcode_hit = await _barcode_search(value, config)
             product_id = barcode_hit.get("code") if barcode_hit else None
             if not product_id:
-                raise VinmonopoletLookupError("Fant ikke denne koden hos Vinmonopolet.", 404)
+                product_id = value
     else:
         product_id = value
 
     official = await _official_product(str(product_id), config)
-    store = await _store_product(str(product_id), config)
+    try:
+        store = await _store_product(str(product_id), config)
+    except VinmonopoletLookupError:
+        if not official and not store_try:
+            raise
+        store = None
+    if store is None:
+        store = store_try
     return map_lookup(str(product_id), store, official, barcode_hit)
 
 
@@ -406,7 +416,7 @@ def parse_barcode_payload(payload: Any) -> dict[str, Any] | None:
 
 async def _barcode_search(ean: str, config: VinmonopoletConfig) -> dict[str, Any] | None:
     url = f"{config.store_base}/vmpws/v2/vmp/products/barCodeSearch/{ean}"
-    payload = await _get_json(url, headers=_store_headers())
+    payload = await _get_json(url, headers=_store_headers(), key_required=False)
     if payload is None:
         return None
     return parse_barcode_payload(payload)
@@ -414,7 +424,12 @@ async def _barcode_search(ean: str, config: VinmonopoletConfig) -> dict[str, Any
 
 async def _store_product(product_id: str, config: VinmonopoletConfig) -> dict[str, Any] | None:
     url = f"{config.store_base}/vmpws/v3/vmp/products/{product_id}"
-    payload = await _get_json(url, headers=_store_headers(), params={"fields": "FULL"})
+    payload = await _get_json(
+        url,
+        headers=_store_headers(),
+        params={"fields": "FULL"},
+        key_required=False,
+    )
     if not isinstance(payload, dict) or payload.get("errors"):
         return None
     return payload
@@ -428,7 +443,12 @@ async def _official_product(product_id: str, config: VinmonopoletConfig) -> dict
         "Accept": "application/json",
         "User-Agent": _USER_AGENT,
     }
-    payload = await _get_json(url, headers=headers, params={"productId": product_id})
+    payload = await _get_json(
+        url,
+        headers=headers,
+        params={"productId": product_id},
+        key_required=True,
+    )
     if isinstance(payload, list):
         for item in payload:
             if isinstance(item, dict):
@@ -448,6 +468,7 @@ async def _get_json(
     *,
     headers: dict[str, str],
     params: dict[str, str] | None = None,
+    key_required: bool = False,
 ) -> Any:
     try:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
@@ -458,7 +479,9 @@ async def _get_json(
         raise VinmonopoletLookupError("Fikk ikke kontakt med Vinmonopolet.", 502) from exc
 
     if response.status_code in (401, 403):
-        raise VinmonopoletLookupError("Vinmonopolet avslo nøkkelen.", 503)
+        if key_required:
+            raise VinmonopoletLookupError("Vinmonopolet avslo nøkkelen.", 503)
+        return None
     if response.status_code == 404:
         return None
     if response.status_code == 429:
