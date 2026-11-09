@@ -85,7 +85,7 @@ export function WineDetailsInput({ value, onChange, disabled }: WineDetailsInput
   }, [name, type, producer, vintage, country, district, subdistrict])
 
   const fieldClass = 'grid gap-1'
-  const errorClass = 'text-sm text-red-600'
+  const errorClass = 'field__error'
 
   return (
     <div className="grid gap-4">

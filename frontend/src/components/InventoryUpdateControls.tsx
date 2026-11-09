@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button } from './ui/button'
 import { useApi } from '../hooks/useApi'
 
 interface Props {
@@ -42,15 +41,15 @@ export default function InventoryUpdateControls({ wineId, currentQuantity, onQua
 
   return (
     <div className="flex items-center gap-2">
-      <Button onClick={() => setPendingQuantity((q) => Math.max(0, q - 1))} disabled={isSaving}>-</Button>
+      <button type="button" className="btn btn--ghost btn--small" onClick={() => setPendingQuantity((q) => Math.max(0, q - 1))} disabled={isSaving}>-</button>
       <input
-        className="w-16 border rounded text-center"
+        className="field-control w-16 text-center"
         type="number"
         value={pendingQuantity}
         onChange={(e) => setPendingQuantity(Math.max(0, Number(e.target.value)))}
       />
-      <Button onClick={() => setPendingQuantity((q) => q + 1)} disabled={isSaving}>+</Button>
-      <Button onClick={submitChange} disabled={!canSave || isSaving} className="ml-2">{isSaving ? 'Saving...' : 'Save'}</Button>
+      <button type="button" className="btn btn--ghost btn--small" onClick={() => setPendingQuantity((q) => q + 1)} disabled={isSaving}>+</button>
+      <button type="button" className="btn btn--primary btn--small" onClick={submitChange} disabled={!canSave || isSaving}>{isSaving ? 'Lagrer…' : 'Lagre'}</button>
     </div>
   )
 }

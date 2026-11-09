@@ -292,6 +292,40 @@ body,
     color: var(--ink-soft);
   }
 
+  .band {
+    margin: 0 0 1.35rem;
+    padding: 1rem 1.1rem 1.1rem;
+    background: rgba(255, 255, 255, 0.34);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .band > .section__head {
+    margin-bottom: 0.85rem;
+  }
+
+  .band .section__head h2 {
+    font-size: 1.45rem;
+  }
+
+  .section__head--sub {
+    margin-top: 1.25rem;
+    margin-bottom: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .section__head--sub h2 {
+    font-size: 1.2rem;
+    color: var(--ink-soft);
+  }
+
+  .field__error {
+    margin: 0.35rem 0 0;
+    color: var(--danger);
+    font-size: 0.85rem;
+  }
+
   .btn {
     display: inline-flex;
     align-items: center;

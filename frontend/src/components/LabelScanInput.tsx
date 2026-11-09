@@ -104,7 +104,7 @@ export function LabelScanInput({ onExtracted, onImageChange, disabled }: Props) 
   }
 
   return (
-    <div className="panel space-y-3">
+    <div className="band space-y-3">
       <div>
         <h2 className="page-title" style={{ fontSize: '1.5rem' }}>Skann etikett</h2>
         <p className="text-sm mt-1" style={{ color: 'var(--ink-soft)' }}>
@@ -157,7 +157,7 @@ export function LabelScanInput({ onExtracted, onImageChange, disabled }: Props) 
 
       {previewUrl && (
         <div className="max-w-sm">
-          <img src={previewUrl} alt="Forhåndsvisning av vinetikett" className="rounded border max-h-64 object-contain bg-white" />
+          <img src={previewUrl} alt="Forhåndsvisning av vinetikett" className="max-h-64 object-contain" style={{ border: '1px solid var(--line)', borderRadius: '2px', background: 'var(--surface)' }} />
         </div>
       )}
 

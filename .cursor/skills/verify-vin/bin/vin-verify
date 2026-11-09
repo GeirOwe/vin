@@ -1,0 +1,237 @@
+#!/bin/bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+SKILL="$(cd "$(dirname "$0")/.." && pwd)"
+POINTER="$SKILL/run/current"
+
+die() { echo "vin-verify: $*" >&2; exit 1; }
+
+port_busy() {
+  lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+spawn_detached() {
+  local pidfile="$1" logfile="$2"
+  shift 2
+  python3 -c '
+import os, sys
+pidfile, logfile, *argv = sys.argv[1:]
+read_fd, write_fd = os.pipe()
+if os.fork() > 0:
+    os.close(write_fd)
+    data = os.read(read_fd, 64).decode().strip()
+    os.close(read_fd)
+    open(pidfile, "w").write(data + "\n")
+    raise SystemExit(0)
+os.close(read_fd)
+os.setsid()
+grandchild = os.fork()
+if grandchild > 0:
+    os.write(write_fd, str(grandchild).encode())
+    os.close(write_fd)
+    os._exit(0)
+os.close(write_fd)
+fd = os.open(logfile, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+os.dup2(fd, 1)
+os.dup2(fd, 2)
+if fd > 2:
+    os.close(fd)
+dn = os.open(os.devnull, os.O_RDONLY)
+os.dup2(dn, 0)
+if dn > 2:
+    os.close(dn)
+cwd = os.environ.pop("SPAWN_CWD", "")
+if cwd:
+    os.chdir(cwd)
+os.execvp(argv[0], argv)
+' "$pidfile" "$logfile" "$@"
+}
+
+next_port() {
+  local port="$1"
+  local cap="$2"
+  while port_busy "$port"; do
+    port=$((port + 1))
+    if (( port > cap )); then
+      die "no free port from $1 through $cap"
+    fi
+  done
+  echo "$port"
+}
+
+wait_http() {
+  local url="$1"
+  local i
+  for i in $(seq 1 60); do
+    if curl -sf "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+cmd_launch() {
+  if [[ -f "$POINTER" ]]; then
+    local existing
+    existing="$(cat "$POINTER")"
+    if [[ -f "$existing/api.pid" ]] && kill -0 "$(cat "$existing/api.pid")" 2>/dev/null; then
+      die "a verify instance is already running at $existing. Run cleanup before launch."
+    fi
+  fi
+
+  local run_id run_dir api_port ui_port
+  run_id="$(date +%Y%m%d%H%M%S)-$$"
+  run_dir="/tmp/vin-verify-$run_id"
+  mkdir -p "$run_dir" "$SKILL/run" "$SKILL/artifacts/$run_id"
+  api_port="$(next_port 8017 8099)"
+  ui_port="$(next_port 5179 5299)"
+
+  local uvicorn="$ROOT/.venv/bin/uvicorn"
+  [[ -x "$uvicorn" ]] || die "missing $uvicorn. Create the venv from the README first."
+  [[ -d "$ROOT/frontend/node_modules/vite" ]] || die "missing frontend/node_modules. Run npm install in frontend first."
+
+  cd "$ROOT"
+  DATABASE_URL="sqlite:///$run_dir/vin.db" \
+  CORS_ORIGINS="http://127.0.0.1:$ui_port,http://localhost:$ui_port" \
+  ENVIRONMENT=verification \
+    spawn_detached "$run_dir/api.pid" "$run_dir/api.log" \
+    "$uvicorn" app.main:app --host 127.0.0.1 --port "$api_port"
+
+  SPAWN_CWD="$ROOT/frontend" \
+  VITE_API_BASE="http://127.0.0.1:$api_port" \
+    spawn_detached "$run_dir/ui.pid" "$run_dir/ui.log" \
+    node "$SKILL/bin/serve-ui.mjs" "$ROOT/frontend" "$ui_port"
+
+  cat >"$run_dir/launch.env" <<EOF
+RUN_ID=$run_id
+RUN_DIR=$run_dir
+API_PORT=$api_port
+UI_PORT=$ui_port
+API_BASE=http://127.0.0.1:$api_port
+UI_BASE=http://127.0.0.1:$ui_port
+DATABASE_URL=sqlite:///$run_dir/vin.db
+VERIFY_USER=vin-verify
+VERIFY_PASSWORD=VerifyVin1
+EVIDENCE_DIR=$SKILL/artifacts/$run_id
+EOF
+
+  if ! wait_http "http://127.0.0.1:$api_port/health"; then
+    echo "api log:" >&2
+    tail -n 40 "$run_dir/api.log" >&2 || true
+    die "API did not become ready"
+  fi
+  if ! wait_http "http://127.0.0.1:$ui_port/"; then
+    echo "ui log:" >&2
+    tail -n 40 "$run_dir/ui.log" >&2 || true
+    die "UI did not become ready"
+  fi
+
+  echo "$run_dir" >"$POINTER"
+  echo "RUN_DIR=$run_dir"
+  echo "UI_BASE=http://127.0.0.1:$ui_port"
+  echo "API_BASE=http://127.0.0.1:$api_port"
+  echo "EVIDENCE_DIR=$SKILL/artifacts/$run_id"
+}
+
+load_run() {
+  local run_dir="${1:-}"
+  if [[ -z "$run_dir" && -f "$POINTER" ]]; then
+    run_dir="$(cat "$POINTER")"
+  fi
+  [[ -n "$run_dir" && -f "$run_dir/launch.env" ]] || die "no launch.env. Pass the RUN_DIR from launch."
+  # shellcheck disable=SC1090
+  set -a
+  source "$run_dir/launch.env"
+  set +a
+  LOADED_RUN_DIR="$run_dir"
+}
+
+cmd_doctor() {
+  load_run "${1:-}"
+  local run_dir="$LOADED_RUN_DIR"
+  local api_pid ui_pid
+  api_pid="$(cat "$run_dir/api.pid")"
+  ui_pid="$(cat "$run_dir/ui.pid")"
+  kill -0 "$api_pid" 2>/dev/null || die "API pid $api_pid is not running"
+  kill -0 "$ui_pid" 2>/dev/null || die "UI pid $ui_pid is not running"
+  [[ "$DATABASE_URL" == sqlite:///"$run_dir"/vin.db ]] || die "database is not the isolated verify file"
+  local health
+  health="$(curl -sf "$API_BASE/health")" || die "health request failed"
+  python3 -c 'import json,sys; body=json.loads(sys.argv[1]); assert body["status"]=="ok"; assert body["database"]["status"]=="ok"' "$health" \
+    || die "health is not ok: $health"
+  curl -sf "$UI_BASE/" >/dev/null || die "UI is not answering"
+  echo "doctor ok"
+  echo "UI_BASE=$UI_BASE"
+  echo "API_BASE=$API_BASE"
+  echo "DATABASE_URL=$DATABASE_URL"
+  echo "EVIDENCE_DIR=$EVIDENCE_DIR"
+}
+
+cmd_seed() {
+  load_run "${1:-}"
+  local run_dir="$LOADED_RUN_DIR"
+  local reg
+  reg="$(curl -sf -X POST "$API_BASE/api/auth/register" \
+    -H 'Content-Type: application/json' \
+    -d "{\"bruker_id\":\"$VERIFY_USER\",\"password\":\"$VERIFY_PASSWORD\",\"password_confirm\":\"$VERIFY_PASSWORD\"}")" \
+    || die "register failed"
+  python3 -c 'import json,sys; body=json.loads(sys.argv[1]); open(sys.argv[2],"w").write(body["access_token"])' "$reg" "$run_dir/token"
+  chmod 600 "$run_dir/token"
+  local token
+  token="$(cat "$run_dir/token")"
+  curl -sf -X POST "$API_BASE/api/wines" \
+    -H "Authorization: Bearer $token" \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"Barolo Riserva","producer":"Gaja","type":"Red","quantity":1}' >/dev/null \
+    || die "seed Barolo failed"
+  curl -sf -X POST "$API_BASE/api/wines" \
+    -H "Authorization: Bearer $token" \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"Chablis","producer":"William Fevre","type":"White","quantity":1}' >/dev/null \
+    || die "seed Chablis failed"
+  echo "seeded $VERIFY_USER with Barolo Riserva and Chablis"
+}
+
+cmd_cleanup() {
+  load_run "${1:-}"
+  local run_dir="$LOADED_RUN_DIR"
+  local pid
+  for pid in "$run_dir/ui.pid" "$run_dir/api.pid"; do
+    if [[ -f "$pid" ]]; then
+      local value
+      value="$(cat "$pid")"
+      if kill -0 "$value" 2>/dev/null; then
+        kill "$value" 2>/dev/null || true
+        local i
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          kill -0 "$value" 2>/dev/null || break
+          sleep 0.2
+        done
+        if kill -0 "$value" 2>/dev/null; then
+          kill -9 "$value" 2>/dev/null || true
+        fi
+      fi
+    fi
+  done
+  if [[ -f "$POINTER" && "$(cat "$POINTER")" == "$run_dir" ]]; then
+    rm -f "$POINTER"
+  fi
+  rm -rf "$run_dir"
+  echo "cleaned $run_dir"
+  echo "evidence kept under $SKILL/artifacts"
+}
+
+usage() {
+  echo "usage: vin-verify launch|doctor [RUN_DIR]|seed [RUN_DIR]|cleanup [RUN_DIR]" >&2
+  exit 2
+}
+
+case "${1:-}" in
+  launch) cmd_launch ;;
+  doctor) cmd_doctor "${2:-}" ;;
+  seed) cmd_seed "${2:-}" ;;
+  cleanup) cmd_cleanup "${2:-}" ;;
+  *) usage ;;
+esac

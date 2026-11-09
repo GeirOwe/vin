@@ -37,7 +37,6 @@ A comprehensive full-stack application for managing wine collections with advanc
 
 ### Backend Setup
 ```bash
-cd /Users/geirowe/Documents/8090SoftwareFactory/vin
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt

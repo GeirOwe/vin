@@ -76,14 +76,14 @@ export default function WineEntryForm() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="section">
       <LabelScanInput
         onExtracted={applyLabelExtraction}
         onImageChange={setLabelImage}
         disabled={loading}
       />
 
-      <div className="section space-y-4">
+      <div className="band">
         <div className="section__head">
           <h2>Vindetaljer</h2>
         </div>
@@ -94,7 +94,7 @@ export default function WineEntryForm() {
         />
       </div>
 
-      <div className="section space-y-4">
+      <div className="band">
         <div className="section__head">
           <h2>Pris og antall</h2>
         </div>
@@ -105,7 +105,7 @@ export default function WineEntryForm() {
         />
       </div>
 
-      <div className="section space-y-4">
+      <div className="band">
         <div className="section__head">
           <h2>Drikkevindu</h2>
         </div>
@@ -116,7 +116,7 @@ export default function WineEntryForm() {
         />
       </div>
 
-      <div className="section space-y-4">
+      <div className="band">
         <div className="section__head">
           <h2>Druvesammensetning</h2>
         </div>

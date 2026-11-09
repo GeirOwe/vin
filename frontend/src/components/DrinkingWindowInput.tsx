@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useApi } from '../hooks/useApi'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
-import { Button } from './ui/button'
-
 interface Props {
   onChange: (v: { drink_after_date?: string; drink_before_date?: string }) => void
   value?: { drink_after_date?: string; drink_before_date?: string }
@@ -62,9 +60,11 @@ export default function DrinkingWindowInput({ onChange, value }: Props) {
         </div>
       </div>
 
-      {/* Optional: Get suggestion from API */}
-      <div className="border-t pt-4">
-        <div className="text-sm font-medium text-gray-600 mb-2">Eller hent forslag basert på type og årgang:</div>
+      <div className="section__head section__head--sub">
+        <h2>Forslag</h2>
+        <p>Hent et vindu fra type og årgang.</p>
+      </div>
+      <div>
         <div className="flex gap-2 items-end">
           <div className="grid gap-1 flex-1">
             <Label htmlFor="suggestion_wine_type">Vintype</Label>
@@ -72,7 +72,7 @@ export default function DrinkingWindowInput({ onChange, value }: Props) {
               id="suggestion_wine_type"
               value={wineType}
               onChange={(e) => setWineType(e.target.value)}
-              className="border rounded px-3 py-2"
+              className="field-control w-full"
             >
               <option>Red</option>
               <option>White</option>
@@ -92,19 +92,19 @@ export default function DrinkingWindowInput({ onChange, value }: Props) {
               onChange={(e) => setVintage(e.target.value ? Number(e.target.value) : '')}
             />
           </div>
-          <Button
+          <button
             type="button"
+            className="btn btn--ghost btn--small"
             onClick={handleGetSuggestion}
             disabled={!wineType || !vintage || loadingSuggestion}
-            variant="outline"
           >
-            {loadingSuggestion ? 'Loading...' : 'Hent forslag'}
-          </Button>
+            {loadingSuggestion ? 'Henter…' : 'Hent forslag'}
+          </button>
         </div>
         {data && (
-          <div className="text-sm text-green-600 mt-2">
-            Suggested window: {data.drink_after_date} → {data.drink_before_date}
-          </div>
+          <p className="text-sm mt-2" style={{ color: 'var(--ink-soft)' }}>
+            Forslag: {data.drink_after_date} til {data.drink_before_date}
+          </p>
         )}
       </div>
     </div>

@@ -90,7 +90,7 @@ export function PricingQuantityInput({ value, onChange, disabled, currencySymbol
           aria-describedby={errors.purchase_price ? 'purchase_price-error' : undefined}
         />
         {errors.purchase_price ? (
-          <span id="purchase_price-error" className="text-sm text-red-600">{errors.purchase_price}</span>
+          <span id="purchase_price-error" className="field__error">{errors.purchase_price}</span>
         ) : null}
       </div>
 
@@ -107,7 +107,7 @@ export function PricingQuantityInput({ value, onChange, disabled, currencySymbol
           aria-describedby={errors.quantity ? 'quantity-error' : undefined}
         />
         {errors.quantity ? (
-          <span id="quantity-error" className="text-sm text-red-600">{errors.quantity}</span>
+          <span id="quantity-error" className="field__error">{errors.quantity}</span>
         ) : null}
       </div>
     </div>

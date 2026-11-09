@@ -125,7 +125,7 @@ export function GrapeCompositionInput({ value, onChange, disabled, showHeading =
                 type="button"
                 onClick={() => removeRow(idx)}
                 disabled={disabled}
-                className="w-full text-sm px-3 py-2 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                className="btn btn--ghost btn--small w-full"
               >
                 Fjern
               </button>
@@ -135,8 +135,8 @@ export function GrapeCompositionInput({ value, onChange, disabled, showHeading =
       </div>
 
       <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-600">Totalt: {total.toFixed(1)}%</span>
-        {errors ? <span className="text-red-600">{errors}</span> : null}
+        <span style={{ color: 'var(--muted-text)' }}>Totalt: {total.toFixed(1)}%</span>
+        {errors ? <span className="field__error">{errors}</span> : null}
       </div>
     </div>
   )
