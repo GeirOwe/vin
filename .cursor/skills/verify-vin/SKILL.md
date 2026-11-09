@@ -1,6 +1,6 @@
 ---
 name: verify-vin
-description: "Drive the Vin cellar app in an isolated browser session and prove a user-facing change. Use when a change touches the React UI, login, the wine collection, add wine, drinking window, or empty bottles, and the proof has to be what a user sees."
+description: "Drive the Vin cellar app in an isolated browser session and prove a user-facing change. Use when a change touches the React UI, login, the wine collection, food pairing, add wine, a bottle code, an existing-wine refresh, delete, drinking window, or empty bottles, and the proof has to be what a user sees."
 ---
 
 # Verify Vin

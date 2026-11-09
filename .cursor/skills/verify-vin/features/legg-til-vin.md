@@ -31,6 +31,6 @@ Preconditions:
 
 - The details block does not send name, type, and producer until all three are non-empty. Wait for that before judging a failed save.
 - `Type` must be the English value `Red`, `White`, `Rose`, `Sparkling`, `Dessert`, or `Fortified`. `Rød` fails create.
-- Rosé is stored as `Rose`.
+- The stored rosé type is the English word `Rose`. Typed `Rosé` fails create, the same way `Rød` does.
 - `Antall` must be a whole number greater than 0, or the wine is stored and then hidden from Samling.
 - The form does not navigate away after save.
