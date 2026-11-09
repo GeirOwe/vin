@@ -1,4 +1,14 @@
-from app.services.vinmonopolet_service import map_lookup, parse_barcode_payload, parse_scan
+import asyncio
+from unittest.mock import patch
+
+from app.core.config import VinmonopoletConfig
+from app.services.vinmonopolet_service import (
+    VinmonopoletLookupError,
+    lookup_wine_code,
+    map_lookup,
+    parse_barcode_payload,
+    parse_scan,
+)
 
 
 STORE = {
@@ -89,10 +99,137 @@ def test_official_grapes_are_used_when_present():
     assert result.grape_composition[0].percentage == 100
 
 
+def _config() -> VinmonopoletConfig:
+    return VinmonopoletConfig(
+        api_key="secret",
+        api_base="https://apis.vinmonopolet.no",
+        store_base="https://www.vinmonopolet.no",
+    )
+
+
+class _Response:
+    def __init__(self, status_code: int, payload: object = None) -> None:
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self) -> object:
+        return self._payload
+
+
+def _route(handler):
+    class _Client:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc) -> bool:
+            return False
+
+        async def get(self, url, headers=None, params=None):
+            return handler(url, headers or {}, params or {})
+
+    return patch("app.services.vinmonopolet_service.httpx.AsyncClient", _Client)
+
+
+def test_storefront_rejection_keeps_the_official_name():
+    def handler(url, headers, params):
+        if "apis.vinmonopolet.no" in url:
+            assert headers["Ocp-Apim-Subscription-Key"] == "secret"
+            return _Response(
+                200,
+                [{"basic": {"productId": "21159501", "productShortName": "La Dame de Montrose"}}],
+            )
+        assert "Ocp-Apim-Subscription-Key" not in headers
+        return _Response(403)
+
+    async def run():
+        with _route(handler):
+            return await lookup_wine_code("21159501", _config())
+
+    result = asyncio.run(run())
+    assert result.name == "La Dame de Montrose"
+    assert result.varenummer == "21159501"
+
+
+def test_official_rejection_still_names_the_key():
+    def handler(url, headers, params):
+        if "apis.vinmonopolet.no" in url:
+            return _Response(401)
+        return _Response(200, {"name": "Butikknavn"})
+
+    async def run():
+        with _route(handler):
+            await lookup_wine_code("1101", _config())
+
+    try:
+        asyncio.run(run())
+    except VinmonopoletLookupError as exc:
+        assert exc.status == 503
+        assert "nøkkelen" in str(exc)
+    else:
+        raise AssertionError("expected key rejection")
+
+
+def test_barcode_rejection_is_not_a_key_error():
+    def handler(url, headers, params):
+        return _Response(403)
+
+    async def run():
+        with _route(handler):
+            await lookup_wine_code("7310865004714", _config())
+
+    try:
+        asyncio.run(run())
+    except VinmonopoletLookupError as exc:
+        assert exc.status == 404
+        assert "nøkkelen" not in str(exc)
+    else:
+        raise AssertionError("expected a missing barcode")
+
+
+def test_storefront_outage_keeps_the_official_name():
+    def handler(url, headers, params):
+        if "apis.vinmonopolet.no" in url:
+            return _Response(200, [{"basic": {"productShortName": "Offisielt navn"}}])
+        return _Response(500)
+
+    async def run():
+        with _route(handler):
+            return await lookup_wine_code("1101", _config())
+
+    result = asyncio.run(run())
+    assert result.name == "Offisielt navn"
+
+
+def test_storefront_outage_is_reported_when_official_is_empty():
+    def handler(url, headers, params):
+        if "apis.vinmonopolet.no" in url:
+            return _Response(404)
+        return _Response(500)
+
+    async def run():
+        with _route(handler):
+            await lookup_wine_code("1101", _config())
+
+    try:
+        asyncio.run(run())
+    except VinmonopoletLookupError as exc:
+        assert exc.status == 502
+    else:
+        raise AssertionError("expected the storefront error")
+
+
 if __name__ == "__main__":
     test_parse_scan_accepts_url_ean_and_varenummer()
     test_parse_barcode_payload_reads_code_name_and_price()
     test_map_lookup_fills_the_cellar_fields()
     test_map_lookup_skips_ingredient_lists_that_are_not_grapes()
     test_official_grapes_are_used_when_present()
+    test_storefront_rejection_keeps_the_official_name()
+    test_official_rejection_still_names_the_key()
+    test_barcode_rejection_is_not_a_key_error()
+    test_storefront_outage_keeps_the_official_name()
+    test_storefront_outage_is_reported_when_official_is_empty()
     print("ok")
