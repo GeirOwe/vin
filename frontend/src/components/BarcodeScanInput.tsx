@@ -22,26 +22,51 @@ type Props = {
   disabled?: boolean
 }
 
+const SCAN_FORMATS = ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
+
+type DetectedBarcode = { rawValue?: string }
+type BarcodeDetectorLike = {
+  detect: (source: CanvasImageSource) => Promise<DetectedBarcode[]>
+}
+type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorLike
+
+function barcodeDetector(): BarcodeDetectorCtor | null {
+  const ctor = (window as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector
+  return ctor ?? null
+}
+
 export function BarcodeScanInput({ onFound, disabled }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const stopRef = useRef<(() => void) | null>(null)
+  const photoRef = useRef<HTMLInputElement>(null)
+  const lookupRef = useRef<(raw: string) => Promise<void>>(async () => {})
   const [code, setCode] = useState('')
   const [scanning, setScanning] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notes, setNotes] = useState<string | null>(null)
 
-  const stopCamera = () => {
+  const releaseCamera = () => {
     try {
       stopRef.current?.()
     } catch {
       // The camera is already stopped.
     }
     stopRef.current = null
-    setScanning(false)
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
   }
 
-  useEffect(() => () => stopRef.current?.(), [])
+  const stopCamera = () => {
+    releaseCamera()
+    setScanning(false)
+    setStarting(false)
+  }
+
+  useEffect(() => () => releaseCamera(), [])
 
   const lookup = async (raw: string) => {
     const value = raw.trim()
@@ -63,81 +88,165 @@ export function BarcodeScanInput({ onFound, disabled }: Props) {
       onFound(data as BarcodeLookupResult)
       setNotes(data?.notes ? String(data.notes) : null)
       if (data?.varenummer) setCode(String(data.varenummer))
-    } catch (err: any) {
-      setError(err?.message || 'Kunne ikke hente vinen')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Kunne ikke hente vinen'
+      setError(message)
     } finally {
       setLoading(false)
     }
   }
+  lookupRef.current = lookup
+
+  const acceptCode = (text: string) => {
+    const value = text.trim()
+    if (!value) return
+    stopCamera()
+    setCode(value)
+    void lookupRef.current(value)
+  }
 
   const startCamera = async () => {
     setError(null)
-    setScanning(true)
+    setNotes(null)
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Denne nettleseren kan ikke åpne kameraet. Ta bilde av koden, eller skriv varenummeret.')
+      return
+    }
+    setStarting(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' } },
+      })
+      streamRef.current = stream
+      setScanning(true)
+    } catch {
+      setError('Fikk ikke tilgang til kameraet. Ta bilde av koden, eller skriv varenummeret.')
+    } finally {
+      setStarting(false)
+    }
   }
 
   useEffect(() => {
     if (!scanning) return
     const video = videoRef.current
-    if (!video) return
-    let cancelled = false
-    let handled = false
+    const stream = streamRef.current
+    if (!video || !stream) return
 
-    const run = async () => {
-      try {
-        const { BrowserMultiFormatReader } = await import('@zxing/browser')
-        if (cancelled) return
-        const reader = new BrowserMultiFormatReader()
-        const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } } },
-          video,
-          (result) => {
-            if (!result || handled || cancelled) return
-            handled = true
-            const text = result.getText()
-            controls.stop()
-            stopRef.current = null
-            setScanning(false)
-            setCode(text)
-            void lookup(text)
-          },
-        )
-        if (cancelled) {
-          controls.stop()
-          return
-        }
-        stopRef.current = () => controls.stop()
-      } catch (err: any) {
-        if (cancelled) return
-        setScanning(false)
-        setError(err?.message || 'Fikk ikke tilgang til kameraet. Lim inn koden i feltet under.')
-      }
+    let stopped = false
+    video.srcObject = stream
+    void video.play().catch(() => {})
+
+    const finish = (text: string) => {
+      if (stopped) return
+      stopped = true
+      acceptCode(text)
     }
-    void run()
+
+    let cancelDecode = () => {}
+    const Detector = barcodeDetector()
+    if (Detector) {
+      const detector = new Detector({ formats: SCAN_FORMATS })
+      const tick = async () => {
+        if (stopped) return
+        try {
+          if (video.readyState >= 2) {
+            const codes = await detector.detect(video)
+            const raw = codes.find((item) => item.rawValue)?.rawValue
+            if (raw) {
+              finish(raw)
+              return
+            }
+          }
+        } catch {
+          // Keep looking. A single frame often has no code.
+        }
+        if (!stopped) window.setTimeout(tick, 200)
+      }
+      void tick()
+      cancelDecode = () => {
+        stopped = true
+      }
+    } else {
+      void (async () => {
+        try {
+          const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
+            import('@zxing/browser'),
+            import('@zxing/library'),
+          ])
+          if (stopped) return
+          const hints = new Map()
+          hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.QR_CODE,
+            BarcodeFormat.EAN_13,
+            BarcodeFormat.EAN_8,
+            BarcodeFormat.UPC_A,
+            BarcodeFormat.UPC_E,
+            BarcodeFormat.CODE_128,
+          ])
+          hints.set(DecodeHintType.TRY_HARDER, true)
+          const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 200 })
+          const controls = await reader.decodeFromStream(stream, video, (result) => {
+            if (result) finish(result.getText())
+          })
+          if (stopped) controls.stop()
+          else cancelDecode = () => controls.stop()
+        } catch {
+          if (stopped) return
+          setError('Klarte ikke å lese kameraet. Ta bilde av koden, eller skriv varenummeret.')
+          stopCamera()
+        }
+      })()
+    }
+
+    stopRef.current = () => {
+      stopped = true
+      cancelDecode()
+    }
 
     return () => {
-      cancelled = true
-      stopRef.current?.()
-      stopRef.current = null
+      stopped = true
+      cancelDecode()
     }
   }, [scanning])
+
+  const onPhoto = async (file: File | null) => {
+    if (!file) return
+    setError(null)
+    setNotes(null)
+    setLoading(true)
+    try {
+      const text = await readCodeFromImage(file)
+      setCode(text)
+      await lookup(text)
+    } catch {
+      setError('Fant ingen kode i bildet. Hold nærmere, eller skriv varenummeret.')
+      setLoading(false)
+    }
+  }
+
+  const busy = disabled || loading || scanning || starting
 
   return (
     <div className="band space-y-3">
       <div>
         <h2 className="page-title" style={{ fontSize: '1.5rem' }}>Skann kode</h2>
         <p className="text-sm mt-1" style={{ color: 'var(--ink-soft)' }}>
-          Skann QR-koden eller strekkoden på flasken. Vinmonopolet fyller ut skjemaet.
+          Skann QR-koden eller strekkoden, eller ta et bilde av den. Du kan også skrive varenummeret.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy} onClick={() => void startCamera()} className="btn btn--primary btn--small">
+          {starting ? 'Åpner kamera…' : 'Skann kode'}
+        </button>
         <button
           type="button"
-          disabled={disabled || loading || scanning}
-          onClick={startCamera}
-          className="btn btn--primary btn--small"
+          disabled={busy}
+          onClick={() => photoRef.current?.click()}
+          className="btn btn--ghost btn--small"
         >
-          Skann kode
+          Ta bilde av koden
         </button>
         {scanning && (
           <button type="button" onClick={stopCamera} className="btn btn--ghost btn--small">
@@ -146,17 +255,31 @@ export function BarcodeScanInput({ onFound, disabled }: Props) {
         )}
       </div>
 
+      <input
+        ref={photoRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0] ?? null
+          e.target.value = ''
+          void onPhoto(file)
+        }}
+      />
+
       {scanning && (
-        <div className="max-w-sm">
+        <div className="max-w-sm space-y-2">
           <video
             ref={videoRef}
             muted
             playsInline
             autoPlay
             aria-label="Kamerabilde for skanning"
-            className="max-h-64 w-full object-contain"
-            style={{ border: '1px solid var(--line)', borderRadius: '2px', background: 'var(--surface)' }}
+            className="w-full object-contain"
+            style={{ height: '240px', border: '1px solid var(--line)', borderRadius: '2px', background: 'var(--surface)' }}
           />
+          <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>Hold koden i bildet.</p>
         </div>
       )}
 
@@ -190,4 +313,40 @@ export function BarcodeScanInput({ onFound, disabled }: Props) {
       {notes && !error && <div className="text-sm" style={{ color: 'var(--ink-soft)' }}>{notes}</div>}
     </div>
   )
+}
+
+async function readCodeFromImage(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file)
+  try {
+    const Detector = barcodeDetector()
+    if (Detector) {
+      const codes = await new Detector({ formats: SCAN_FORMATS }).detect(bitmap)
+      const raw = codes.find((item) => item.rawValue)?.rawValue
+      if (raw) return raw
+    }
+  } finally {
+    bitmap.close()
+  }
+
+  const url = URL.createObjectURL(file)
+  try {
+    const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
+      import('@zxing/browser'),
+      import('@zxing/library'),
+    ])
+    const hints = new Map()
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.QR_CODE,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_128,
+    ])
+    hints.set(DecodeHintType.TRY_HARDER, true)
+    const result = await new BrowserMultiFormatReader(hints).decodeFromImageUrl(url)
+    return result.getText()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }
