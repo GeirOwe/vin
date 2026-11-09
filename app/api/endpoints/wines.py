@@ -461,6 +461,7 @@ def update_wine(
 
         update_data = payload.model_dump(exclude_unset=True)
         grape_payload = update_data.pop("grape_composition", None)
+        food_payload = update_data.pop("food_pairings", None)
         update_data.pop("label_image_base64", None)
         update_data.pop("label_image_content_type", None)
 
@@ -483,6 +484,9 @@ def update_wine(
                         percentage=gc["percentage"],
                     )
                 )
+
+        if food_payload is not None:
+            replace_food_pairings(wine, [FoodPairing.model_validate(item) for item in food_payload])
 
         db.commit()
         wine = get_owned_wine(db, wine_id, current_user.id, load_grapes=True)

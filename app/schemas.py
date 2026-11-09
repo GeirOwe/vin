@@ -139,6 +139,20 @@ class WineUpdateRequest(BaseModel):
     grape_composition: Optional[List[GrapeCompositionSchema]] = None
     label_image_base64: Optional[str] = None
     label_image_content_type: Optional[str] = Field(default=None, max_length=100)
+    varenummer: Optional[str] = Field(default=None, max_length=32)
+    food_pairings: Optional[List[FoodPairing]] = None
+
+    @field_validator("varenummer")
+    @classmethod
+    def varenummer_digits(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        if not cleaned.isdigit():
+            raise ValueError("varenummer must contain only digits")
+        return cleaned
 
     @model_validator(mode="after")
     def validate_dates_and_grapes(self) -> "WineUpdateRequest":

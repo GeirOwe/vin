@@ -8,6 +8,7 @@ import { GrapeCompositionInput, type GrapeComposition } from './GrapeComposition
 import { WineLabelLightbox, WineLabelThumb } from './WineLabelThumb'
 import { vinmonopoletImageUrl } from '../lib/vinmonopolet'
 import { TASTE_VERDICTS, formatTasteDice, tasteVerdictLabel, type TasteVerdict } from '../lib/taste'
+import type { BarcodeLookupResult } from './BarcodeScanInput'
 
 interface WineInformationDisplayProps {
   wine: Wine
@@ -54,8 +55,13 @@ export default function WineInformationDisplay({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [foodBusy, setFoodBusy] = useState(false)
-  const [foodError, setFoodError] = useState<string | null>(null)
+  const [lookupCode, setLookupCode] = useState(wine.varenummer || '')
+  const [lookupBusy, setLookupBusy] = useState(false)
+  const [lookupMessage, setLookupMessage] = useState<string | null>(null)
+  const [lookupError, setLookupError] = useState<string | null>(null)
+  const [pendingFood, setPendingFood] = useState<Array<{ code: string; name: string }> | null>(null)
+  const [pendingVarenummer, setPendingVarenummer] = useState<string | null>(null)
+  const [pendingGrapes, setPendingGrapes] = useState(false)
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -77,23 +83,72 @@ export default function WineInformationDisplay({
     }
   }
 
-  const refreshFood = async () => {
-    setFoodBusy(true)
-    setFoodError(null)
+  const clearPendingLookup = () => {
+    setPendingFood(null)
+    setPendingVarenummer(null)
+    setPendingGrapes(false)
+  }
+
+  const applyLookup = (data: BarcodeLookupResult) => {
+    if (data.name) setName(data.name)
+    if (data.producer) setProducer(data.producer)
+    if (data.vintage) setVintage(String(data.vintage))
+    if (data.type) setType(data.type)
+    if (data.country) setCountry(data.country)
+    if (data.district) setDistrict(data.district)
+    if (data.subdistrict) setSubdistrict(data.subdistrict)
+    if (data.purchase_price != null) setPurchasePrice(String(data.purchase_price))
+    const nextGrapes = (data.grape_composition || [])
+      .filter((grape) => grape.grape_variety)
+      .map((grape) => ({
+        grape_variety: grape.grape_variety,
+        percentage: Number(grape.percentage || 0),
+      }))
+    if (nextGrapes.length) {
+      setGrapes(nextGrapes)
+      setGrapeFormKey((key) => key + 1)
+      setPendingGrapes(true)
+    }
+    if (data.varenummer) {
+      setLookupCode(data.varenummer)
+      setPendingVarenummer(data.varenummer)
+    }
+    setPendingFood(data.food_pairings?.length ? data.food_pairings : null)
+    setIsEditingOm(true)
+    const foods = (data.food_pairings || []).map((food) => food.name).join(', ')
+    setLookupMessage(
+      foods
+        ? `Feltene er fylt fra Vinmonopolet. Passer til ${foods}. Se over og lagre.`
+        : 'Feltene er fylt fra Vinmonopolet. Se over og lagre.'
+    )
+  }
+
+  const fetchFromVinmonopolet = async () => {
+    const value = lookupCode.trim()
+    if (!value) {
+      setLookupError('Skriv varenummeret eller strekkoden fra flasken.')
+      setLookupMessage(null)
+      return
+    }
+    setLookupBusy(true)
+    setLookupError(null)
+    setLookupMessage(null)
     try {
-      const res = await fetch(`${API_BASE}/api/wines/${wine.id}/food-pairings`, {
+      const res = await fetch(`${API_BASE}/api/wines/lookup-barcode`, {
         method: 'POST',
-        headers: authHeaders(),
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ code: value }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(errorMessage(data, res.status))
-      onWineUpdate?.()
+      applyLookup(data as BarcodeLookupResult)
     } catch (err: unknown) {
-      setFoodError(err instanceof Error ? err.message : 'Klarte ikke å hente matparing')
+      setLookupError(err instanceof Error ? err.message : 'Kunne ikke hente vinen')
     } finally {
-      setFoodBusy(false)
+      setLookupBusy(false)
     }
   }
+
   const [isEditingDruer, setIsEditingDruer] = useState(false)
   const [isEditingDrinkingWindow, setIsEditingDrinkingWindow] = useState(false)
   const [isEditingVurdering, setIsEditingVurdering] = useState(false)
@@ -151,6 +206,7 @@ export default function WineInformationDisplay({
         percentage: g.percentage,
       }))
     )
+    setLookupCode(wine.varenummer || '')
     setLabelThumbKey((k) => k + 1)
   }, [wine])
 
@@ -190,6 +246,8 @@ export default function WineInformationDisplay({
     if (labelPreview) URL.revokeObjectURL(labelPreview)
     setLabelPreview(null)
     setSaveError(null)
+    clearPendingLookup()
+    setLookupMessage(null)
   }
 
   const handleSaveOm = async () => {
@@ -205,6 +263,15 @@ export default function WineInformationDisplay({
       updateData.district = district || null
       updateData.subdistrict = subdistrict || null
       if (purchasePrice !== '') updateData.purchase_price = parseFloat(purchasePrice)
+      if (pendingVarenummer) updateData.varenummer = pendingVarenummer
+      if (pendingFood && pendingFood.length > 0) updateData.food_pairings = pendingFood
+      if (pendingGrapes) {
+        const cleaned = grapes
+          .filter((grape) => grape.grape_variety.trim())
+          .map((grape) => ({ grape_variety: grape.grape_variety.trim(), percentage: Number(grape.percentage) }))
+        const total = cleaned.reduce((sum, grape) => sum + grape.percentage, 0)
+        if (cleaned.length > 0 && Math.abs(total - 100) <= 0.5) updateData.grape_composition = cleaned
+      }
 
       if (labelImage) {
         updateData.label_image_base64 = await blobToBase64(labelImage)
@@ -217,6 +284,8 @@ export default function WineInformationDisplay({
         return
       }
       setIsEditingOm(false)
+      clearPendingLookup()
+      setLookupMessage(null)
       setLabelImage(null)
       if (labelPreview) URL.revokeObjectURL(labelPreview)
       setLabelPreview(null)
@@ -351,6 +420,42 @@ export default function WineInformationDisplay({
             </p>
           </div>
         </div>
+      )}
+
+      {showInventoryTracking && (
+        <section className="wine-block">
+          <div className="wine-block__head">
+            <h2>Vinmonopolet</h2>
+          </div>
+          <p className="text-sm" style={{ color: 'var(--ink-soft)', marginBottom: '0.75rem' }}>
+            Skriv varenummeret eller strekkoden fra flasken. Se over feltene og lagre.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <input
+              className="field-control"
+              style={{ maxWidth: '16rem' }}
+              value={lookupCode}
+              onChange={(e) => setLookupCode(e.target.value)}
+              placeholder="Varenummer eller strekkode"
+              aria-label="Varenummer eller strekkode"
+              disabled={lookupBusy || isSaving}
+            />
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={fetchFromVinmonopolet}
+              disabled={lookupBusy || isSaving}
+            >
+              {lookupBusy ? 'Henter…' : 'Hent fra Vinmonopolet'}
+            </button>
+          </div>
+          {lookupMessage && (
+            <p className="text-sm mt-2" style={{ color: 'var(--ink-soft)' }}>{lookupMessage}</p>
+          )}
+          {lookupError && (
+            <p className="text-sm mt-2" style={{ color: 'var(--danger)' }}>{lookupError}</p>
+          )}
+        </section>
       )}
 
       <section className="wine-block">
@@ -743,18 +848,16 @@ export default function WineInformationDisplay({
         <section className="wine-block">
           <div className="wine-block__head">
             <h2>Passer til</h2>
-            {wine.varenummer && (
-              <button type="button" className="btn btn--ghost btn--small" onClick={refreshFood} disabled={foodBusy}>
-                {foodBusy ? 'Henter…' : 'Hent fra Vinmonopolet'}
-              </button>
-            )}
           </div>
           <p className="wine-field__value">
-            {wine.food_pairings && wine.food_pairings.length > 0
-              ? wine.food_pairings.map((food) => food.name).join(', ')
-              : 'Ingen matparing lagret.'}
+            {(pendingFood && pendingFood.length > 0
+              ? pendingFood
+              : wine.food_pairings
+            )?.map((food) => food.name).join(', ') || 'Ingen matparing lagret.'}
           </p>
-          {foodError && <p className="text-sm mt-2" style={{ color: 'var(--danger)' }}>{foodError}</p>}
+          {pendingFood && pendingFood.length > 0 && (
+            <p className="text-sm mt-2" style={{ color: 'var(--ink-soft)' }}>Ikke lagret ennå.</p>
+          )}
         </section>
       )}
 

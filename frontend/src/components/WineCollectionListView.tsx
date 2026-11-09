@@ -222,7 +222,7 @@ export default function WineCollectionListView({
             }}
             disabled={foodBusy}
           >
-            {foodBusy ? 'Henter…' : 'Hent matparing'}
+            {foodBusy ? 'Henter…' : 'Vin som passer'}
           </button>
         </div>
       )}
