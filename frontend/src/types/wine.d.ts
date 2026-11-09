@@ -1,5 +1,10 @@
 // Wine type definitions for the frontend application
 
+export interface FoodPairing {
+  code: string
+  name: string
+}
+
 export interface Grape {
   id: number
   grape_variety: string
@@ -24,6 +29,7 @@ export interface Wine {
   grape_composition: Grape[]
   has_label_image?: boolean
   varenummer?: string | null
+  food_pairings?: FoodPairing[]
 }
 
 export interface WineListItem {
@@ -41,6 +47,7 @@ export interface WineListItem {
   grape_composition: Grape[]
   has_label_image?: boolean
   varenummer?: string | null
+  food_pairings?: FoodPairing[]
 }
 
 export type WineType = 'Red' | 'White' | 'Rose' | 'Sparkling' | 'Dessert' | 'Fortified'

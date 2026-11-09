@@ -10,7 +10,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session, selectinload
 
 from ...database import get_db
-from ...models import User, Wine, GrapeComposition, InventoryLog, TastingNote
+from ...models import User, Wine, GrapeComposition, InventoryLog, TastingNote, WineFoodPairing
 from ...core.security import get_current_user
 from ...schemas import (
     WineCreateRequest,
@@ -30,10 +30,17 @@ from ...schemas import (
     BarcodeLookupRequest,
     BarcodeLookupResponse,
     WineFilterOptionsResponse,
+    FoodPairing,
+    FoodPairingRefreshResponse,
 )
 from ...services.wine_api_service import fetch_drinking_window_suggestion, ExternalApiError, SupportedWineType
 from ...services.label_extraction_service import extract_wine_from_label_image, LabelExtractionError
-from ...services.vinmonopolet_service import lookup_wine_code, VinmonopoletLookupError
+from ...services.vinmonopolet_service import (
+    FOOD_PAIRING_CHOICES,
+    fetch_food_pairings,
+    lookup_wine_code,
+    VinmonopoletLookupError,
+)
 from ...core.config import XaiConfig, VinmonopoletConfig
 
 
@@ -48,6 +55,7 @@ def get_owned_wine(
     load_grapes: bool = False,
 ) -> Wine:
     stmt = select(Wine).where(Wine.id == wine_id, Wine.user_id == user_id)
+    stmt = stmt.options(selectinload(Wine.food_pairings))
     if load_grapes:
         stmt = stmt.options(selectinload(Wine.grape_compositions))
     wine = db.execute(stmt).scalar_one_or_none()
@@ -103,7 +111,22 @@ def to_wine_response(wine: Wine) -> WineResponse:
         ],
         has_label_image=wine_has_label(wine),
         varenummer=wine.varenummer,
+        food_pairings=food_rows(wine),
     )
+
+
+def food_rows(wine: Wine) -> List[FoodPairing]:
+    return [FoodPairing(code=row.code, name=row.name) for row in (wine.food_pairings or [])]
+
+
+def replace_food_pairings(wine: Wine, pairings: List[FoodPairing]) -> None:
+    wine.food_pairings.clear()
+    seen: set[str] = set()
+    for item in pairings:
+        if item.code in seen:
+            continue
+        seen.add(item.code)
+        wine.food_pairings.append(WineFoodPairing(code=item.code, name=item.name))
 
 
 def apply_filters(
@@ -116,6 +139,7 @@ def apply_filters(
     subdistrict: Optional[str],
     drinking_window_status: Optional[str] = None,
     grape: Optional[str] = None,
+    food: Optional[str] = None,
 ):
     if search_term:
         like = f"%{search_term}%"
@@ -134,6 +158,8 @@ def apply_filters(
         stmt = stmt.filter(
             Wine.grape_compositions.any(GrapeComposition.grape_variety.ilike(grape))
         )
+    if food:
+        stmt = stmt.filter(Wine.food_pairings.any(WineFoodPairing.code == food.strip()))
 
     # Drinking window status filtering
     if drinking_window_status:
@@ -203,10 +229,24 @@ def wine_filter_options(
         .order_by(GrapeComposition.grape_variety)
     ).scalars().all()
 
+    stored = db.execute(
+        select(WineFoodPairing.code, WineFoodPairing.name)
+        .join(Wine, WineFoodPairing.wine_id == Wine.id)
+        .where(owned, in_stock)
+        .distinct()
+    ).all()
+    foods = [FoodPairing(code=code, name=name) for code, name in FOOD_PAIRING_CHOICES]
+    seen = {code for code, _name in FOOD_PAIRING_CHOICES}
+    for code, name in stored:
+        if code and code not in seen:
+            foods.append(FoodPairing(code=code, name=name))
+            seen.add(code)
+
     return WineFilterOptionsResponse(
         types=[t for t in types if t],
         districts=[d for d in districts if d],
         grapes=[g for g in grapes if g],
+        foods=foods,
     )
 
 
@@ -221,18 +261,19 @@ def list_wines(
     district: Optional[str] = Query(None),
     subdistrict: Optional[str] = Query(None),
     grape: Optional[str] = Query(None),
+    food: Optional[str] = Query(None, max_length=8),
     drinking_window_status: Optional[str] = Query(None),
     quantity_filter: Optional[str] = Query("non_zero", pattern="^(non_zero|zero|all)$"),
 ) -> List[WineResponse]:
     try:
         stmt = (
             select(Wine)
-            .options(selectinload(Wine.grape_compositions))
+            .options(selectinload(Wine.grape_compositions), selectinload(Wine.food_pairings))
             .where(Wine.user_id == current_user.id)
             .order_by(Wine.id.desc())
         )
         stmt = apply_filters(
-            stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status, grape
+            stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status, grape, food
         )
         
         # Apply quantity filter (default: exclude zero quantity wines)
@@ -266,6 +307,7 @@ def list_wines_page(
     district: Optional[str] = Query(None),
     subdistrict: Optional[str] = Query(None),
     grape: Optional[str] = Query(None),
+    food: Optional[str] = Query(None, max_length=8),
     drinking_window_status: Optional[str] = Query(None),
     quantity_filter: Optional[str] = Query("non_zero", pattern="^(non_zero|zero|all)$"),
 ) -> WineListPageResponse:
@@ -273,11 +315,11 @@ def list_wines_page(
         # Base query with eager load to prevent N+1
         base_stmt = (
             select(Wine)
-            .options(selectinload(Wine.grape_compositions))
+            .options(selectinload(Wine.grape_compositions), selectinload(Wine.food_pairings))
             .where(Wine.user_id == current_user.id)
         )
         base_stmt = apply_filters(
-            base_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status, grape
+            base_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status, grape, food
         )
         
         # Apply quantity filter (default: exclude zero quantity wines)
@@ -312,7 +354,7 @@ def list_wines_page(
         # Count total AFTER filters (including quantity filter)
         count_stmt = select(func.count(Wine.id))
         count_stmt = apply_filters(
-            count_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status, grape
+            count_stmt, search_term, wine_type, vintage, country, district, subdistrict, drinking_window_status, grape, food
         )
         # Apply quantity filter consistently with main query
         if not drinking_window_status:
@@ -349,6 +391,7 @@ def list_wines_page(
                 ],
                 has_label_image=wine_has_label(w),
                 varenummer=w.varenummer,
+                food_pairings=food_rows(w),
             )
             for w in wines
         ]
@@ -370,6 +413,25 @@ def delete_wine(
     db.delete(wine)
     db.commit()
     return Response(status_code=HTTPStatus.NO_CONTENT)
+
+
+@router.post("/{wine_id}/food-pairings", response_model=WineResponse)
+async def refresh_wine_food_pairings(
+    wine_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> WineResponse:
+    wine = get_owned_wine(db, wine_id, current_user.id, load_grapes=True)
+    if not wine.varenummer:
+        raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Vinen har ikke varenummer.")
+    try:
+        pairings = await fetch_food_pairings(wine.varenummer, VinmonopoletConfig.from_env())
+    except VinmonopoletLookupError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+    replace_food_pairings(wine, pairings)
+    db.commit()
+    wine = get_owned_wine(db, wine_id, current_user.id, load_grapes=True)
+    return to_wine_response(wine)
 
 
 @router.get("/{wine_id}", response_model=WineResponse)
@@ -664,6 +726,34 @@ async def lookup_barcode(
         raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
 
 
+@router.post("/refresh-food-pairings", response_model=FoodPairingRefreshResponse)
+async def refresh_food_pairings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FoodPairingRefreshResponse:
+    """Fill Passer til for every owned wine that already has a varenummer."""
+    wines = db.execute(
+        select(Wine)
+        .options(selectinload(Wine.food_pairings))
+        .where(Wine.user_id == current_user.id)
+    ).scalars().all()
+    config = VinmonopoletConfig.from_env()
+    updated = failed = skipped = 0
+    for wine in wines:
+        if not wine.varenummer:
+            skipped += 1
+            continue
+        try:
+            pairings = await fetch_food_pairings(wine.varenummer, config)
+        except VinmonopoletLookupError:
+            failed += 1
+            continue
+        replace_food_pairings(wine, pairings)
+        updated += 1
+    db.commit()
+    return FoodPairingRefreshResponse(updated=updated, failed=failed, skipped=skipped)
+
+
 @router.get("/{wine_id}/label-image")
 def get_wine_label_image(
     wine_id: int,
@@ -718,6 +808,9 @@ def create_wine(
                 )
                 db.add(gc_row)
                 created_grapes.append(gc_row)
+
+        if payload.food_pairings:
+            replace_food_pairings(wine, payload.food_pairings)
 
         db.commit()
         db.refresh(wine)
